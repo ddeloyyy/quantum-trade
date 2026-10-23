@@ -167,7 +167,7 @@ dialog label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px}
 const P={CAPITAL:10000,WIN:30,THR:.6,HALF_LIFE:10,
   TIERS:[[10e6,"large",.16,1],[1e6,"medium",.08,.5],[50e3,"regular",.03,.25],[0,"small",.01,.25]],BIG:50e3,
   STOP:-.15,TRAIL_K:2.5,TRAIL_MIN:.10,TRAIL_MAX:.25,TP_LEVEL:.30,TP_FRAC:1/3,
-  MAX_ASSET:.15,MAX_ASSET_CRYPTO:.10,MAX_CRYPTO:.35,MIN_CASH:.20,DAY_LOSS:-.04,KILL:-.20,
+  MAX_ASSET:.15,MAX_ASSET_CRYPTO:.10,MAX_CRYPTO:.60,MIN_CASH:.20,DAY_LOSS:-.04,KILL:-.20,
   MIN_TRADE:25,FEE:.001,TARGET_VOL:.45,CHASE_SKIP:.20,CHASE_HALF:.10,HIT_H:20,STALE:120};
 const WATCH_GROUPS=new Set(["Market makers"]);
 const KEY="quantum-trade-live-v1";
@@ -299,7 +299,7 @@ function step(){
   const braked=equity()/acc.dayEq-1<=P.DAY_LOSS;
   for(const e of [...S.events].sort((x,y)=>x.d<y.d?-1:1)){
     if(S.seen[e.key])continue;
-    if(e.t==="move"||skip.has(e.w)||e.hold||e.d>t||dn(e.d)<dn(t)-3){S.seen[e.key]=1;continue}
+    if(e.t==="move"||skip.has(e.w)||e.d>t||dn(e.d)<dn(t)-3){S.seen[e.key]=1;continue}
     const a=e.a;
     if(!pxNow(a))continue;                 // wait for a price, retry next round
     S.seen[e.key]=1;
@@ -424,7 +424,7 @@ async function pullTraders(){
   setH("wh","busy");let ok=0;const t=today(),ts=nowTs();
   for(const p of hlP){const addr=p.wallets.find(w=>w[2]==="hyperliquid")[0];
     try{const [pos,av]=await hlPositions(addr);ok++;if(av)p.av=Math.round(av);
-      const k=p.id+":hl",first=!S.snaps[k],prev=S.snaps[k]||{},thr=Math.max(10e3,.005*(av||0)),src=["Hyperliquid",`https://app.hyperliquid.xyz/explorer/address/${addr}`];
+      const k=p.id+":hl",first=!S.snaps[k],prev=S.snaps[k]||{},thr=Math.max(10e3,.002*(av||0)),src=["Hyperliquid",`https://app.hyperliquid.xyz/explorer/address/${addr}`];
       for(const c of new Set([...Object.keys(prev),...Object.keys(pos)])){const px=S.live[c];if(!px)continue;
         if(first){const sz=pos[c]||0;if(Math.abs(sz)*px>=25e3)addEvent({key:`hl-${p.id}-${c}-${ts}`,d:t,td:t,w:p.id,a:c,t:sz>0?"buy":"sell",usd:Math.round(Math.abs(sz)*px),k:"crypto",hold:true,txt:`Holds a ${sz>0?"long":"short"} of ${Math.abs(sz).toLocaleString("en-US",{maximumFractionDigits:2})} ${c}`,src});continue}
         const d=(pos[c]||0)-(prev[c]||0);if(Math.abs(d)*px<thr)continue;
@@ -616,12 +616,12 @@ function render(){
   $("log").innerHTML=lg.length?lg.map(l=>`<div class="row"><span class="sub">${esc(when(l[0]))}</span><div class="why">${esc(l[1])}</div><span></span></div>`).join(""):'<div class="empty">Nothing yet.</div>';
   renderSignals();renderPlayers();
   $("scout").innerHTML=S.scout.length?S.scout.slice().reverse().map(s=>`<div class="row"><span class="tag ${s.status==="promoted"?"t-buy":s.status==="rejected"?"t-sell":"t-move"}">${esc(s.status)}</span><div><b>${esc(s.name)}</b><div class="why">${esc(s.why)}</div><div class="why">${esc(s.check)}</div>${s.src?`<a class="sub" href="${esc(s.src[1])}" target="_blank" rel="noopener">${esc(s.src[0])}</a>`:""}</div><span class="sub">${esc((s.found||"").slice(0,10))}</span></div>`).join(""):'<div class="empty">The scout runs once a day while this page is open.</div>';
-  const rl=[["Every proven player","copied, size by track record"],["Veto","skip if 60% go the other way"],["Others agree","up to 2× size"],["Signal window",P.WIN+" days"],["Older signals weigh less","half after "+P.HALF_LIFE+" days"],["Hard stop-loss",pct(P.STOP,0)],["Trailing stop","10–25% by volatility"],["Take profit","sell ⅓ at +30%"],["Max per stock","15%"],["Max per coin","10%"],["Max all crypto","35%"],["Cash floor","20%"],["Daily loss brake","no buys after −4%"],["Emergency stop","−20% from peak"],["Skip if price ran","over +20%"],["Fee per trade","0.1%"]];
+  const rl=[["Every proven player","copied, size by track record"],["Veto","skip if 60% go the other way"],["Others agree","up to 2× size"],["Signal window",P.WIN+" days"],["Older signals weigh less","half after "+P.HALF_LIFE+" days"],["Hard stop-loss",pct(P.STOP,0)],["Trailing stop","10–25% by volatility"],["Take profit","sell ⅓ at +30%"],["Max per stock","15%"],["Max per coin","10%"],["Max all crypto","60%"],["Cash floor","20%"],["Daily loss brake","no buys after −4%"],["Emergency stop","−20% from peak"],["Skip if price ran","over +20%"],["Fee per trade","0.1%"]];
   $("rules").innerHTML=rl.map(r=>`<div><span class="sub">${r[0]}</span><b class="num">${esc(r[1])}</b></div>`).join("");
 }
 function renderSignals(){
   const nm=names();
-  const s=S.events.filter(e=>!e.hold&&(sigK==="all"||e.k===sigK)).sort((x,y)=>x.d<y.d?1:x.d>y.d?-1:0).slice(0,150);
+  const s=S.events.filter(e=>(sigK==="all"||e.k===sigK)).sort((x,y)=>x.d<y.d?1:x.d>y.d?-1:0).slice(0,150);
   $("signals").innerHTML=s.length?s.map(e=>`<div class="row"><span class="tag t-${e.t}">${e.t}</span><div><b>${esc(nm[e.w]||e.w)}</b> · <b class="${e.k==="crypto"?"k-crypto":"k-stock"}">${esc(e.a)}</b> <span class="num">${big(e.usd)}</span><div class="why">${esc(e.txt)}</div>${e.src?`<a class="sub" href="${esc(e.src[1])}" target="_blank" rel="noopener">${esc(e.src[0])}</a>`:""}</div><span class="sub">${esc(e.d)}</span></div>`).join(""):'<div class="empty">No signals.</div>';
 }
 function renderPlayers(){
@@ -637,6 +637,7 @@ $("pq").addEventListener("input",renderPlayers);
 
 /* ================= Start ================= */
 S=load()||freshState();
+if((S.ver||1)<2){for(const e of S.events)if(e.hold&&e.d>=iso(dn(today())-1))delete S.seen[e.key];S.ver=2}
 if(!S.acc){openAccount();for(const e of S.events)if(dn(e.d)<dn(today())-3)S.seen[e.key]=1;logMsg("Demo account opened with $10,000.")}
 if(S.lastRun&&Date.now()-S.lastRun>3600e3)logMsg(`Back after ${Math.round((Date.now()-S.lastRun)/3600e3)}h closed. Catching up on signals from the last 3 days.`);
 setInterval(()=>{S.lastRun=Date.now()},30e3);
