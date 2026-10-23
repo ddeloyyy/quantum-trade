@@ -165,10 +165,10 @@ dialog label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px}
 "use strict";
 /* ================= Rules: plain math, no AI ================= */
 const P={CAPITAL:10000,WIN:30,THR:.6,HALF_LIFE:10,
-  TIERS:[[10e6,"large",.16,1],[1e6,"medium",.08,.5],[0,"small",.03,.25]],
+  TIERS:[[10e6,"large",.16,1],[1e6,"medium",.08,.5],[50e3,"regular",.03,.25],[0,"small",.01,.25]],BIG:50e3,
   STOP:-.15,TRAIL_K:2.5,TRAIL_MIN:.10,TRAIL_MAX:.25,TP_LEVEL:.30,TP_FRAC:1/3,
   MAX_ASSET:.15,MAX_ASSET_CRYPTO:.10,MAX_CRYPTO:.35,MIN_CASH:.20,DAY_LOSS:-.04,KILL:-.20,
-  MIN_TRADE:50,FEE:.001,TARGET_VOL:.45,CHASE_SKIP:.20,CHASE_HALF:.10,HIT_H:20,STALE:120};
+  MIN_TRADE:25,FEE:.001,TARGET_VOL:.45,CHASE_SKIP:.20,CHASE_HALF:.10,HIT_H:20,STALE:120};
 const WATCH_GROUPS=new Set(["Market makers"]);
 const KEY="quantum-trade-live-v1";
 const DAY=864e5;
@@ -303,26 +303,23 @@ function step(){
     const a=e.a;
     if(!pxNow(a))continue;                 // wait for a price, retry next round
     S.seen[e.key]=1;
-    const c=consensus(a,skip);if(!c)continue;
+    const c=consensus(a,skip);
     const [kname,buyF,sellF]=tier(e.usd),who=names[e.w]||e.w,[mult,why]=checks(e);
     if(mult===0){logMsg(`${who} ${e.t} ${a}: skipped, ${why}`);continue}
-    const solo=c.n<2;
-    if(e.t==="buy"&&c.buy>=P.THR&&c.vb>=P.THR&&!braked){
-      const E=equity(),held=(acc.pos[a]?.q||0)*pxNow(a);
-      let size=buyF*c.vb*mult*(solo?.5:1)*weight(e.w);const v_=vol(a);if(v_)size*=Math.min(1,P.TARGET_VOL/v_);
-      const cap=isCrypto(a)?P.MAX_ASSET_CRYPTO:P.MAX_ASSET;
-      const room=[E*size,E*cap-held,acc.cash-E*P.MIN_CASH];
+    // follow every proven player; others only veto (60% of players and money the other way) or boost size when they agree
+    const opp=c&&(e.t==="buy"?c.sell>=P.THR&&c.vs>=P.THR:c.buy>=P.THR&&c.vb>=P.THR);
+    if(opp){logMsg(`${who} ${e.t} ${a}: skipped, ${pc(e.t==="buy"?c.sell:c.buy)} of players go the other way`);continue}
+    const agree=c&&c.n>=2?(e.t==="buy"?c.vb:c.vs):0,boost=c&&c.n>=2?.75+.75*agree:.75;
+    const note=c&&c.n>=2?`${pc(e.t==="buy"?c.buy:c.sell)} of ${c.n} players agree`:"only player on this asset";
+    if(e.t==="buy"&&!braked){
+      const E=equity(),held=(acc.pos[a]?.q||0)*pxNow(a);let size=buyF*mult*weight(e.w)*boost;const v_=vol(a);if(v_)size*=Math.min(1,P.TARGET_VOL/v_);
+      const room=[E*size,E*(isCrypto(a)?P.MAX_ASSET_CRYPTO:P.MAX_ASSET)-held,acc.cash-E*P.MIN_CASH];
       if(isCrypto(a)){let cr=0;for(const k in acc.pos)if(isCrypto(k))cr+=acc.pos[k].q*acc.pos[k].last;room.push(E*P.MAX_CRYPTO-cr)}
       const v=Math.min(...room);
-      if(v<P.MIN_TRADE){logMsg(`${who} buy ${a}: agreed, but ${["size too small","asset limit reached","cash floor reached","crypto limit reached"][room.indexOf(v)]}`);continue}
-      let msg=solo?`${who}: ${kname} buy (only player on this asset, half size)`:`${who}: ${kname} buy, ${pc(c.buy)} of ${c.n} players agree`;
-      if(why)msg+="; "+why;
-      trade(a,"buy",v,msg,e.key);
-    }else if(e.t==="buy"&&braked)logMsg(`${who} buy ${a}: paused, daily loss brake is on`);
-    else if(e.t==="buy")logMsg(`${who} buy ${a}: no consensus, ${pc(c.buy)} of ${c.n} players and ${pc(c.vb)} of money buying`);
-    else if(e.t==="sell"&&c.sell>=P.THR&&c.vs>=P.THR&&acc.pos[a]){
-      trade(a,"sell",acc.pos[a].q*pxNow(a)*Math.min(1,sellF*mult),`${who}: ${kname} sell, ${pc(c.sell)} of ${c.n} players agree`,e.key);
-    }
+      if(v<P.MIN_TRADE){logMsg(`${who} buy ${a}: ${["size too small","asset limit reached","cash floor reached","crypto limit reached"][room.indexOf(v)]}`);continue}
+      trade(a,"buy",v,`${who}: ${kname} buy, ${note}`+(why?"; "+why:""),e.key);
+    }else if(e.t==="buy")logMsg(`${who} buy ${a}: paused, daily loss brake is on`);
+    else if(acc.pos[a])trade(a,"sell",acc.pos[a].q*pxNow(a)*Math.min(1,sellF*mult*boost/.75),`${who}: ${kname} sell, ${note}`,e.key);
   }
   const E=equity();acc.peak=Math.max(acc.peak,E);
   if(E/acc.peak-1<=P.KILL){for(const a of Object.keys(acc.pos))trade(a,"sell",acc.pos[a].q*pxNow(a),"Emergency stop: account fell 20% from its peak");acc.paused=true;logMsg("Emergency stop: everything sold, bot paused")}
@@ -427,9 +424,9 @@ async function pullTraders(){
   setH("wh","busy");let ok=0;const t=today(),ts=nowTs();
   for(const p of hlP){const addr=p.wallets.find(w=>w[2]==="hyperliquid")[0];
     try{const [pos,av]=await hlPositions(addr);ok++;if(av)p.av=Math.round(av);
-      const k=p.id+":hl",first=!S.snaps[k],prev=S.snaps[k]||{},thr=Math.max(50e3,.02*(av||0)),src=["Hyperliquid",`https://app.hyperliquid.xyz/explorer/address/${addr}`];
+      const k=p.id+":hl",first=!S.snaps[k],prev=S.snaps[k]||{},thr=Math.max(10e3,.005*(av||0)),src=["Hyperliquid",`https://app.hyperliquid.xyz/explorer/address/${addr}`];
       for(const c of new Set([...Object.keys(prev),...Object.keys(pos)])){const px=S.live[c];if(!px)continue;
-        if(first){const sz=pos[c]||0;if(Math.abs(sz)*px>=100e3)addEvent({key:`hl-${p.id}-${c}-${ts}`,d:t,td:t,w:p.id,a:c,t:sz>0?"buy":"sell",usd:Math.round(Math.abs(sz)*px),k:"crypto",hold:true,txt:`Holds a ${sz>0?"long":"short"} of ${Math.abs(sz).toLocaleString("en-US",{maximumFractionDigits:2})} ${c}`,src});continue}
+        if(first){const sz=pos[c]||0;if(Math.abs(sz)*px>=25e3)addEvent({key:`hl-${p.id}-${c}-${ts}`,d:t,td:t,w:p.id,a:c,t:sz>0?"buy":"sell",usd:Math.round(Math.abs(sz)*px),k:"crypto",hold:true,txt:`Holds a ${sz>0?"long":"short"} of ${Math.abs(sz).toLocaleString("en-US",{maximumFractionDigits:2})} ${c}`,src});continue}
         const d=(pos[c]||0)-(prev[c]||0);if(Math.abs(d)*px<thr)continue;
         addEvent({key:`hl-${p.id}-${c}-${ts}`,d:t,td:t,w:p.id,a:c,t:d>0?"buy":"sell",usd:Math.round(Math.abs(d)*px),k:"crypto",
           txt:`${d>0?"Bought":"Sold"} ${Math.abs(d).toLocaleString("en-US",{maximumFractionDigits:2})} ${c} (~$${Math.round(Math.abs(d)*px).toLocaleString("en-US")}), now ${(pos[c]||0).toLocaleString("en-US",{maximumFractionDigits:2})}`,src})}
@@ -447,9 +444,9 @@ async function pullWallets(){
         const prev=snap[w[0]];if(prev)for(const a of new Set([...Object.keys(prev),...Object.keys(cur[w[0]])])){const d=(cur[w[0]][a]||0)-(prev[a]||0);net[a]=(net[a]||0)+d;gross[a]=(gross[a]||0)+Math.abs(d)}}
       catch(e){fail++;if(snap[w[0]])cur[w[0]]=snap[w[0]]}
       await sleep(250)}
-    for(const a in gross){const px=pxNow(a);if(!px||gross[a]*px<100e3)continue;const n=net[a],src=["Blockscout",`https://eth.blockscout.com/address/${p.wallets[0][0]}`];
+    for(const a in gross){const px=pxNow(a);if(!px||gross[a]*px<10e3)continue;const n=net[a],src=["Blockscout",`https://eth.blockscout.com/address/${p.wallets[0][0]}`];
       if(Math.abs(n)<.25*gross[a])addEvent({key:`wl-${p.id}-${a}-${ts}`,d:t,td:t,w:p.id,a,t:"move",usd:Math.round(gross[a]*px),k:"crypto",txt:`Moved ${a} between own wallets (net change ${n.toFixed(2)})`,src});
-      else if(Math.abs(n)*px>=100e3)addEvent({key:`wl-${p.id}-${a}-${ts}`,d:t,td:t,w:p.id,a,t:n>0?"buy":"sell",usd:Math.round(Math.abs(n)*px),k:"crypto",txt:`${n>0?"Added":"Reduced"} ${Math.abs(n).toLocaleString("en-US",{maximumFractionDigits:2})} ${a} across tracked wallets (~$${Math.round(Math.abs(n)*px).toLocaleString("en-US")})`,src})}
+      else if(Math.abs(n)*px>=10e3)addEvent({key:`wl-${p.id}-${a}-${ts}`,d:t,td:t,w:p.id,a,t:n>0?"buy":"sell",usd:Math.round(Math.abs(n)*px),k:"crypto",txt:`${n>0?"Added":"Reduced"} ${Math.abs(n).toLocaleString("en-US",{maximumFractionDigits:2})} ${a} across tracked wallets (~$${Math.round(Math.abs(n)*px).toLocaleString("en-US")})`,src})}
     S.snaps[p.id]=cur}
   setH("wl",ok?(fail>ok?"bad":"ok"):"bad");S.wallTs=Date.now();
 }
@@ -498,6 +495,13 @@ async function runScout(){
   const known=new Set([...S.players.flatMap(p=>(p.wallets||[]).map(w=>w[0].toLowerCase())),...S.scout.map(s=>s.addr)]);
   const cands=[];for(const r of rows){const a=(r.ethAddress||"").toLowerCase();if(!a||known.has(a))continue;const sc=scoutScore(r);if(sc)cands.push([sc[0],sc[1],sc[2],a,r.displayName])}
   cands.sort((x,y)=>y[0]-x[0]);
+  // start-up: with fewer than 10 tracked traders, follow the strongest proven ones right away
+  const live=S.players.filter(p=>p.group==="Whales (Hyperliquid)"&&!(p.status&&p.status[0]==="rejected")).length;
+  const direct=cands.splice(0,Math.max(0,10-live));
+  for(const [sc,av,p,addr,disp] of direct){const name=disp||`HL trader ${short(addr)}`;
+    S.players.push({id:"hl-"+addr.slice(2,10),name,role:`Hyperliquid top trader: account $${(av/1e6).toFixed(1)}M, all-time PnL $${(p.allTime.pnl/1e6).toFixed(1)}M`,group:"Whales (Hyperliquid)",kind:"crypto",wallets:[[addr,"Hyperliquid account","hyperliquid"]],src:["Hyperliquid leaderboard",`https://app.hyperliquid.xyz/explorer/address/${addr}`],added:today()});
+    S.scout.push({id:"hl-"+addr.slice(2,10),addr,name,found:new Date().toISOString(),status:"promoted",why:`Account $${(av/1e6).toFixed(1)}M, all-time PnL $${(p.allTime.pnl/1e6).toFixed(1)}M`,check:"Added at start-up: long proven track record on the leaderboard",src:["Hyperliquid leaderboard",`https://app.hyperliquid.xyz/explorer/address/${addr}`]});
+    logMsg(`Now following top trader ${name}`)}
   for(const [sc,av,p,addr,disp] of cands.slice(0,5)){
     try{const [pos,avn]=await hlPositions(addr);const name=disp||`HL trader ${short(addr)}`;
       S.scout.push({id:"hl-"+addr.slice(2,10),addr,name,found:new Date().toISOString(),status:"probation",score:+sc.toFixed(4),
@@ -523,11 +527,13 @@ function record(){const E=equity(),ts=nowTs(),last=S.curve.at(-1);
 async function tick(){
   if(busy)return;busy=true;
   try{
-    await pullMids();
+    const round=()=>{stampPrices();step();record();save();render()};
+    await pullMids();round();
     if(Date.now()-lastSlow>5*60e3){lastSlow=Date.now();
-      await pullFilings();await pullTraders();await pullWallets();await pullStocks();await pullCandles();
-      try{await runScout()}catch(e){}}
-    stampPrices();step();record();save();
+      await pullFilings();try{await runScout()}catch(e){}round();
+      await pullStocks();await pullCandles();round();
+      await pullWallets();round();}
+    await pullTraders();round();
   }catch(e){console.error(e)}
   finally{busy=false;nextAt=Date.now()+60e3;render()}
 }
@@ -590,7 +596,7 @@ function render(){
   $("statusTxt").textContent=status;$("statusPill").className="pill "+(status==="Bot running"?"on":"off");
   $("bStop").textContent=status==="Bot running"?"Stop bot":"Start bot";
   const secs=Math.max(0,Math.round((nextAt-Date.now())/1000));
-  $("liveTxt").textContent=busy?"Checking markets and players now…":`Last check ${new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})}. Prices every minute, players every 5 minutes.`;
+  $("liveTxt").textContent=busy?"Checking markets and players now…":`Last check ${new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})}. Prices and traders every minute, wallets and filings every 5 minutes.`;
   $("kEq").textContent=usd(E);$("kEqS").textContent=`started ${usd(a.capital,0)} on ${a.start}`;
   $("kRet").textContent=pct(ret,2);$("kRet").className="v "+cls(ret);$("kRetS").textContent=`peak ${usd(a.peak,0)} · fees ${usd(a.fees)}`;
   $("kCash").textContent=usd(a.cash,0);$("kCashS").textContent=`${(a.cash/E*100).toFixed(0)}% of the account, min 20%`;
@@ -603,14 +609,14 @@ function render(){
   $("pos").innerHTML=pos.length?`<table><thead><tr><th>Asset</th><th class="r">Value</th><th class="r hide-sm">Avg cost</th><th class="r">Price</th><th class="r">P/L</th><th class="r hide-sm">Stop</th></tr></thead><tbody>${
     pos.map(p=>{const pl=p.last/p.avg-1,stop=Math.max(p.avg*(1+P.STOP),p.hi*(1-trail(p.a)));
       return `<tr><td><b class="${isCrypto(p.a)?"k-crypto":"k-stock"}">${esc(p.a)}</b> <span class="sub">${(p.value/E*100).toFixed(0)}%</span></td><td class="r num">${usd(p.value)}</td><td class="r num hide-sm">${usd(p.avg)}</td><td class="r num">${usd(p.last)}</td><td class="r num ${cls(pl)}">${pct(pl)}</td><td class="r num hide-sm">${usd(stop)}</td></tr>`}).join("")}</tbody></table>`
-    :'<div class="empty">No positions yet, all cash. The bot buys when 60% of players and money agree.</div>';
+    :'<div class="empty">No positions yet, all cash. The bot copies each tracked player, sized by the bet and their track record.</div>';
   const trs=S.trades.slice(-300).reverse();$("trSub").textContent=`${S.trades.length} total`;
   $("trades").innerHTML=trs.length?trs.map(t=>`<div class="row"><span class="tag t-${t.side}">${t.side}</span><div><b>${esc(t.a)}</b> <span class="num">${usd(t.v)}</span> at <span class="num">${usd(t.px)}</span>${t.pl!=null?` · <span class="num ${cls(t.pl)}">${usd(t.pl)}</span>`:""}<div class="why">${esc(t.why)}</div></div><span class="sub">${esc(when(t.ts))}</span></div>`).join(""):'<div class="empty">No trades yet.</div>';
   const lg=S.log.slice(-150).reverse();
   $("log").innerHTML=lg.length?lg.map(l=>`<div class="row"><span class="sub">${esc(when(l[0]))}</span><div class="why">${esc(l[1])}</div><span></span></div>`).join(""):'<div class="empty">Nothing yet.</div>';
   renderSignals();renderPlayers();
   $("scout").innerHTML=S.scout.length?S.scout.slice().reverse().map(s=>`<div class="row"><span class="tag ${s.status==="promoted"?"t-buy":s.status==="rejected"?"t-sell":"t-move"}">${esc(s.status)}</span><div><b>${esc(s.name)}</b><div class="why">${esc(s.why)}</div><div class="why">${esc(s.check)}</div>${s.src?`<a class="sub" href="${esc(s.src[1])}" target="_blank" rel="noopener">${esc(s.src[0])}</a>`:""}</div><span class="sub">${esc((s.found||"").slice(0,10))}</span></div>`).join(""):'<div class="empty">The scout runs once a day while this page is open.</div>';
-  const rl=[["Consensus needed","60% of players and money"],["Signal window",P.WIN+" days"],["Older signals weigh less","half after "+P.HALF_LIFE+" days"],["Hard stop-loss",pct(P.STOP,0)],["Trailing stop","10–25% by volatility"],["Take profit","sell ⅓ at +30%"],["Max per stock","15%"],["Max per coin","10%"],["Max all crypto","35%"],["Cash floor","20%"],["Daily loss brake","no buys after −4%"],["Emergency stop","−20% from peak"],["Skip if price ran","over +20%"],["Fee per trade","0.1%"]];
+  const rl=[["Every proven player","copied, size by track record"],["Veto","skip if 60% go the other way"],["Others agree","up to 2× size"],["Signal window",P.WIN+" days"],["Older signals weigh less","half after "+P.HALF_LIFE+" days"],["Hard stop-loss",pct(P.STOP,0)],["Trailing stop","10–25% by volatility"],["Take profit","sell ⅓ at +30%"],["Max per stock","15%"],["Max per coin","10%"],["Max all crypto","35%"],["Cash floor","20%"],["Daily loss brake","no buys after −4%"],["Emergency stop","−20% from peak"],["Skip if price ran","over +20%"],["Fee per trade","0.1%"]];
   $("rules").innerHTML=rl.map(r=>`<div><span class="sub">${r[0]}</span><b class="num">${esc(r[1])}</b></div>`).join("");
 }
 function renderSignals(){
