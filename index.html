@@ -110,6 +110,14 @@ dialog label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px}
 .mk div{background:var(--panel-2);border-radius:8px;padding:8px 10px}.mk .l{font-size:11px;color:var(--muted)}.mk .v{font-family:var(--font-mono);font-weight:700;font-size:15px}
 .mh{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 6px}
 .note{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5}
+.feed{display:flex;flex-direction:column;max-height:340px;overflow:auto}
+.frow{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;align-items:start;padding:8px 8px 8px 10px;border-left:3px solid var(--line);border-bottom:1px solid var(--line);transition:background 2s}
+.frow.buy{border-left-color:var(--up)}.frow.sell{border-left-color:var(--down)}.frow.player{border-left-color:var(--accent)}
+.frow.fresh{background:color-mix(in srgb,var(--accent) 12%,transparent);animation:fin .4s ease-out}
+.frow .why{font-size:12px;color:var(--muted)}
+.ftag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+@keyframes fin{from{transform:translateY(-6px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.frow.fresh{animation:none}}
 .foot{margin-top:18px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:12px}
 </style>
 </head>
@@ -144,13 +152,14 @@ dialog label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px}
   </section>
   <div class="grid">
     <div class="col">
+      <section class="card"><h2><span>Live activity</span><span class="sub" id="feedSub"></span></h2><div class="feed" id="feed"></div></section>
       <section class="card chart"><h2><span>Account value</span><span class="sub" id="chartSub"></span></h2><div id="chart"></div></section>
       <section class="card"><h2><span>Positions</span><span class="sub">Stop = price where the bot sells to protect you</span></h2><div id="pos"></div></section>
-      <section class="card"><h2><span>Short-term book</span><span class="sub" id="mSub"></span></h2><div id="micro"></div></section>
       <section class="card"><h2><span>Bot trades</span><span class="sub" id="trSub"></span></h2><div class="list" id="trades"></div></section>
       <section class="card"><h2><span>Bot decisions</span><span class="sub">what it saw and why it acted or passed</span></h2><div class="list" id="log"></div></section>
     </div>
     <div class="col">
+      <section class="card"><h2><span>Copied portfolio</span><span class="sub" id="tgSub"></span></h2><div id="target"></div></section>
       <section class="card"><h2><span>Signals from players</span>
         <span class="tabs" id="sigTabs"><button aria-pressed="true" data-k="all">All</button><button aria-pressed="false" data-k="stock">Stocks</button><button aria-pressed="false" data-k="crypto">Crypto</button></span></h2>
         <div class="list" id="signals"></div></section>
@@ -175,7 +184,6 @@ dialog label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px}
   </form>
 </dialog>
 <div class="toast" id="toast" hidden></div>
-<div class="tstack" id="tstack" aria-live="polite"></div>
 
 <script type="application/json" id="seed">{"players":[{"id":"oge-trump-donald-j","name":"Donald Trump","role":"President of the United States","group":"Trump family & WLFI","kind":"stocks","wallets":[["0x94845333028b1204fbe14e1278fd4adde46b22ce","Personal wallet","ethereum"]],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"31,211 disclosed stock trades across brokerage accounts"},{"id":"oge-mody-arjun","name":"Arjun Mody","role":"Deputy Commissioner, Social Security Administration, Social Security Administration","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"306 disclosed trades"},{"id":"oge-wright-christopher","name":"Christopher Wright","role":"Secretary of Energy, Department of Energy","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"301 disclosed trades"},{"id":"oge-phelan-john","name":"John Phelan","role":"Secretary of the Navy, Department of Defense - Department of the Navy","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"176 disclosed trades"},{"id":"oge-bisignano-frank-j","name":"Frank J Bisignano","role":"Commissioner, Social Security Administration","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"166 disclosed trades"},{"id":"oge-mcmahon-linda","name":"Linda McMahon","role":"Secretary of Education, Department of Education","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"162 disclosed trades"},{"id":"oge-burgum-douglas-j","name":"Douglas J Burgum","role":"Secretary, Department of the Interior","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"153 disclosed trades"},{"id":"oge-isaacman-jared","name":"Jared Isaacman","role":"Administrator, National Aeronautics and Space Administration","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"147 disclosed trades"},{"id":"oge-dixon-stacey","name":"Stacey Dixon","role":"Principal Deputy Director of National Intelligence, Office of the Director of National Intelligence","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"115 disclosed trades"},{"id":"oge-mullin-markwayne","name":"Markwayne Mullin","role":"Secretary of Homeland Security","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"98 disclosed trades"},{"id":"oge-chavez-deremer-lori","name":"Lori Chavez-DeRemer","role":"Secretary of Labor, Department of Labor","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"97 disclosed trades"},{"id":"oge-bedford-bryan","name":"Bryan Bedford","role":"FAA Administrator, Department of Transportation","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"94 disclosed trades"},{"id":"oge-kupor-scott-a","name":"Scott A Kupor","role":"Director, Office of Personnel Management, Office of Personnel Management","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"93 disclosed trades"},{"id":"oge-ueland-eric-m","name":"Eric M Ueland","role":"Deputy Director for Management, Office of Management and Budget","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"93 disclosed trades"},{"id":"oge-landau-christopher","name":"Christopher Landau","role":"Deputy Secretary of State, Department of State","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"89 disclosed trades"},{"id":"oge-miran-stephen-i","name":"Stephen I Miran","role":"Member, Board of Governors, Board of Governors of the Federal Reserve System","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"89 disclosed trades"},{"id":"oge-criswell-deanne","name":"Deanne Criswell","role":"Administrator, Federal Emergency Management Agency, Department of Homeland Security","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"80 disclosed trades"},{"id":"oge-kratsios-michael-j","name":"Michael J Kratsios","role":"Director, Office of Science and Technology Policy, Office of Science and Technology Policy","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"66 disclosed trades"},{"id":"oge-warsh-kevin","name":"Kevin Warsh","role":"Chairman, Federal Reserve System Board of Governors","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"65 disclosed trades"},{"id":"oge-edgar-troy-d","name":"Troy D Edgar","role":"Deputy Secretary, Department of Homeland Security","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"63 disclosed trades"},{"id":"oge-sonderling-keith-e","name":"Keith E Sonderling","role":"Acting Secretary of Labor, Department of Labor","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"41 disclosed trades"},{"id":"oge-duffy-sean","name":"Sean Duffy","role":"Secretary, Department of Transportation","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"40 disclosed trades"},{"id":"oge-hegseth-pete","name":"Pete Hegseth","role":"Secretary of Defense, Department of Defense","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"29 disclosed trades"},{"id":"oge-mcmaster-sean","name":"Sean McMaster","role":"Administrator, Federal Highway Administration, Department of Transportation","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"29 disclosed trades"},{"id":"oge-bessent-scott","name":"Scott Bessent","role":"Secretary of the Treasury, Department of the Treasury","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"26 disclosed trades"},{"id":"oge-macgregor-katharine","name":"Katharine MacGregor","role":"Deputy Secretary, Department of the Interior","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"23 disclosed trades"},{"id":"oge-lutnick-howard","name":"Howard Lutnick","role":"Secretary of Commerce, Department of Commerce","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"20 disclosed trades"},{"id":"oge-blanche-todd","name":"Todd Blanche","role":"Acting Attorney General, Department of Justice","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"15 disclosed trades"},{"id":"oge-turner-eric-scott","name":"Eric Scott Turner","role":"Secretary of Housing and Urban Development, Department of Housing and Urban Development","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"15 disclosed trades"},{"id":"oge-whitaker-michael","name":"Michael Whitaker","role":"Administrator, Federal Aviation Administration, Department of Transportation","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"15 disclosed trades"},{"id":"oge-gabbard-tulsi","name":"Tulsi Gabbard","role":"Director of National Intelligence, Office of the Director of National Intelligence","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"13 disclosed trades"},{"id":"oge-kennedy-robert-f","name":"Robert F Kennedy","role":"Secretary, Department of Health and Human Services","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"9 disclosed trades"},{"id":"oge-vaden-stephen-a","name":"Stephen A Vaden","role":"Deputy Secretary, Department of Agriculture","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"6 disclosed trades"},{"id":"oge-bailey-sara","name":"Sara Bailey","role":"Director, Office of National Drug Control Policy","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"5 disclosed trades"},{"id":"oge-zeldin-lee","name":"Lee Zeldin","role":"Administrator, Environmental Protection Agency","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"4 disclosed trades"},{"id":"oge-lawrence-paul-r","name":"Paul R Lawrence","role":"Deputy Secretary, Department of Veterans Affairs","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"3 disclosed trades"},{"id":"oge-molinaro-marcus","name":"Marcus Molinaro","role":"Administrator, Federal Transit Administration, Department of Transportation","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"3 disclosed trades"},{"id":"oge-bondi-pam","name":"Pam Bondi","role":"Attorney General, Department of Justice","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"2 disclosed trades"},{"id":"oge-faulkender-michael-w","name":"Michael W Faulkender","role":"Deputy Secretary, Department of the Treasury","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"1 disclosed trades"},{"id":"oge-noem-kristi","name":"Kristi Noem","role":"Secretary, Department of Homeland Security","group":"Government officials","kind":"stocks","wallets":[],"src":["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],"more":"1 disclosed trades"},{"id":"wlfi","name":"World Liberty Financial","role":"Trump family DeFi project treasury","group":"Trump family & WLFI","kind":"crypto","wallets":[["0x5be9a4959308A0D0c7bC0870E319314d8D957dBB","Treasury","ethereum"],["0x77a56647fba0eb60abb7395574Cded565F6F94F6","Swap wallet","ethereum"],["0xe217e15b3c19cc0427f9492dc3bcfe8220afad10","Token sale contract","ethereum"]],"src":["The Block / CoinDesk","https://www.theblock.co/post/330469/trump-backed-world-liberty-financial-is-swapping-stablecoins-for-eth-onchain-data-shows"]},{"id":"sun","name":"Justin Sun","role":"Founder of TRON","group":"Crypto founders","kind":"crypto","wallets":[["0x43594da5d6a03b2137a04df5685805c676def7cb","Binance withdrawal wallet","ethereum"],["0x72132bF09a9ee6517F3f1d997b4b3cd2115E5991","~$300M wallet (Arkham AI match)","ethereum"],["0xB3d8D8D659d4dc89699826D46585ac6cB3bEA05A","SUN Investments (Etherscan label)","ethereum"]],"src":["AMBCrypto / Arkham","https://info.arkm.com/research/justin-sun-net-worth"],"more":"136 to 142 wallets attributed by Arkham"},{"id":"vitalik","name":"Vitalik Buterin","role":"Co-founder of Ethereum","group":"Crypto founders","kind":"crypto","wallets":[["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045","vitalik.eth","ethereum"]],"src":["ENS / Etherscan","https://etherscan.io/address/0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"]},{"id":"hayes","name":"Arthur Hayes","role":"Co-founder of BitMEX, Maelstrom","group":"Traders","kind":"crypto","wallets":[],"src":["CryptoPotato / Lookonchain","https://cryptopotato.com/days-later-arthur-hayes-sells-entire-eth-position-at-a-loss/"],"more":"Addresses tracked by Lookonchain, not printed in the source","status":["rejected","Bought 5,900 ETH and sold all of it two days later at a $606K loss"]},{"id":"bitmine","name":"Bitmine (Tom Lee)","role":"ETH treasury company, 5.74M ETH","group":"Funds & treasuries","kind":"crypto","wallets":[],"src":["The Block","https://www.theblock.co/post/407536/tom-lee-bitmine-reportedly-adds-70-million"],"more":"Buys through FalconX and Kraken hot wallets"},{"id":"usg","name":"U.S. Government","role":"Seized-asset wallets, 324,552 BTC","group":"Government officials","kind":"crypto","wallets":[],"src":["Arkham","https://info.arkm.com/announcements/the-us-government-is-now-an-entity-on-arkham"],"more":"Arkham entity \"usg\""},{"id":"jump","name":"Jump Trading","role":"Trading firm","group":"Market makers","kind":"crypto","wallets":[["0xf584f8728b874a6a5c7a8d4d387c9aae9172d621","Jump Trading","ethereum"],["0xe62240a57f0efbf549e278e8058f632af3ea5206","Jump Trading: Coinbase Deposit","ethereum"],["0xf05e2a70346560d3228c7002194bb7c5dc8fe100","Jump Trading: Binance Deposit","ethereum"]],"src":["Etherscan labels","https://etherscan.io/accounts/label/fund"]},{"id":"wintermute","name":"Wintermute","role":"Market maker","group":"Market makers","kind":"crypto","wallets":[["0xb3f923eabaf178fc1bd8e13902fc5c61d3ddef5b","Wintermute: Binance Deposit","ethereum"]],"src":["Etherscan labels","https://etherscan.io/address/0xb3f923eabaf178fc1bd8e13902fc5c61d3ddef5b"],"more":"Fresh OTC wallets appear weekly"},{"id":"falconx","name":"FalconX","role":"Prime broker, OTC desk","group":"Market makers","kind":"crypto","wallets":[["0x60009b78da046ac64ef789c29ca05b79cdf73c10","FalconX: Foster City","ethereum"],["0xb43d7a63391bc768d5981b0d91152eb76dee9a6a","FalconX: WBTC Merchant Deposit Address","ethereum"],["0x1157a2076b9bb22a85cc2c162f20fab3898f4101","FalconX: 0x115...101","ethereum"]],"src":["Etherscan labels","https://etherscan.io/accounts/label/fund"]},{"id":"genesis","name":"Genesis Trading","role":"OTC desk","group":"Market makers","kind":"crypto","wallets":[["0x97c77fbf8990fa2442f1e97001ce91ac7333bf80","Genesis Trading: OTC Desk 6","ethereum"],["0x6d21266dfcf5541bee9f67c4837aaa72b3bf9303","Genesis Trading: OTC Desk 3","ethereum"],["0xd628f7c481c7dd87f674870bec5d7a311fb1d9a2","Genesis Trading: OTC Desk","ethereum"],["0x7119cb953db332a3b60730d5d39e7b1ba5120e86","Genesis Trading: OTC Desk 5","ethereum"],["0x6c85006eae121cf2444f0852cab9914607915df2","Genesis Trading: OTC Desk 4","ethereum"],["0x0548f59fee79f8832c299e01dca5c76f034f558e","Genesis Trading: OTC Desk 2","ethereum"]],"src":["Etherscan labels","https://etherscan.io/accounts/label/genesis-trading"]},{"id":"amber","name":"Amber Group","role":"Trading firm","group":"Market makers","kind":"crypto","wallets":[["0xe11970f2f3de9d637fb786f2d869f8fea44195ac","Amber Group","ethereum"]],"src":["Etherscan labels","https://etherscan.io/accounts/label/fund"]},{"id":"auros","name":"Auros Global","role":"Market maker","group":"Market makers","kind":"crypto","wallets":[["0xff0cefdbd6bf757cc0cc361ddfbde432186ccaa6","Auros Global","ethereum"]],"src":["Etherscan labels","https://etherscan.io/accounts/label/fund"]},{"id":"qcp","name":"QCP Capital","role":"Trading firm","group":"Market makers","kind":"crypto","wallets":[["0x572f17ecfff768f9c31881f66bd97b18a651fc20","QCP Capital: WBTC Merchant Deposit Address","ethereum"]],"src":["Etherscan labels","https://etherscan.io/accounts/label/wbtc-merchant"]},{"id":"a16z","name":"a16z crypto","role":"Venture fund","group":"Funds & treasuries","kind":"crypto","wallets":[["0x05e793ce0c6027323ac150f6d45c2344d28b6019","a16z","ethereum"],["0xf25f26a42adcb153b1966a4bf5df6d0c9e27197f","Compound Voting: a16z","ethereum"],["0x2b1ad6184a6b0fac06bd225ed37c2abc04415ff4","Sybil Delegate: a16z","ethereum"]],"src":["Etherscan labels","https://etherscan.io/address/0x05e793ce0c6027323ac150f6d45c2344d28b6019"]},{"id":"paradigm","name":"Paradigm","role":"Venture fund","group":"Funds & treasuries","kind":"crypto","wallets":[["0xa1b61405791170833070c0ea61ed28728a840241","Compound Voting: Paradigm","ethereum"]],"src":["Etherscan labels","https://etherscan.io/address/0xa1b61405791170833070c0ea61ed28728a840241"]},{"id":"polychain","name":"Polychain Capital","role":"Venture fund","group":"Funds & treasuries","kind":"crypto","wallets":[["0xed409c9ff60f3020abf9012bcd45fc294f5608ff","Compound Voting: Polychain Capital","ethereum"]],"src":["Etherscan labels","https://etherscan.io/address/0xed409c9ff60f3020abf9012bcd45fc294f5608ff"]},{"id":"pantera","name":"Pantera Capital","role":"Venture fund","group":"Funds & treasuries","kind":"crypto","wallets":[["0xe5b5cf0e5d044c3e984b910dbc89b19186d24b03","Compound Voting: Pantera Capital","ethereum"]],"src":["Etherscan labels","https://etherscan.io/address/0xe5b5cf0e5d044c3e984b910dbc89b19186d24b03"]},{"id":"dragonfly","name":"Dragonfly Capital","role":"Venture fund","group":"Funds & treasuries","kind":"crypto","wallets":[["0x50495480cce225c8476e90466d8615a9e6a5e004","Compound Voting: Dragonfly Capital","ethereum"]],"src":["Etherscan labels","https://etherscan.io/address/0x50495480cce225c8476e90466d8615a9e6a5e004"]},{"id":"spartan","name":"Spartan Group","role":"Crypto fund","group":"Funds & treasuries","kind":"crypto","wallets":[["0x6633a4a14209d40694db630c251d1e8036663c5c","Spartan Group","ethereum"]],"src":["Etherscan labels","https://etherscan.io/address/0x6633a4a14209d40694db630c251d1e8036663c5c"]},{"id":"defiance","name":"DeFiance Capital","role":"Crypto fund","group":"Funds & treasuries","kind":"crypto","wallets":[["0x9b5ea8c719e29a5bd0959faf79c9e5c8206d0499","DeFiance Capital","ethereum"]],"src":["Etherscan labels","https://etherscan.io/address/0x9b5ea8c719e29a5bd0959faf79c9e5c8206d0499"]},{"id":"arca","name":"Arca","role":"Crypto fund","group":"Funds & treasuries","kind":"crypto","wallets":[["0x23a5efe19aa966388e132077d733672cf5798c03","Arca: 0x23a...c03","ethereum"]],"src":["Etherscan labels","https://etherscan.io/address/0x23a5efe19aa966388e132077d733672cf5798c03"]},{"id":"bcap","name":"Blockchain Capital","role":"Venture fund","group":"Funds & treasuries","kind":"crypto","wallets":[["0xb13fa6eff52e6db8e9f0f1b60b744a9a9a01425a","Blockchain Capital: Oracle DAO Node","ethereum"],["0x9e3421274fb4053a83917d62bd368332e9e71fe0","Blockchain Capital: Oracle DAO Rewards","ethereum"]],"src":["Etherscan labels","https://etherscan.io/accounts/label/fund"]},{"id":"nexo","name":"Nexo","role":"Crypto lender, corporate treasury","group":"Funds & treasuries","kind":"crypto","wallets":[["0x65b0bf8ee4947edd2a500d74e50a3d757dc79de0","Nexo: WBTC Merchant Deposit Address","ethereum"],["0x00ee047a66d5cff27587a61559138c26b62f7ceb","Nexo 1","ethereum"],["0x354e9fa5c6ee7e6092158a8c1b203ccac932d66d","Nexo: Deposit Funder","ethereum"],["0x0031e147a79c45f24319dc02ca860cb6142fcba1","Nexo 3","ethereum"],["0x9bdb521a97e95177bf252c253e256a60c3e14447","Nexo: Corporate Treasury","ethereum"],["0x7344e478574acbe6dac9de1077430139e17eec3d","Nexo 4","ethereum"],["0xffec0067f5a79cff07527f63d83dd5462ccf8ba4","Nexo 2","ethereum"]],"src":["Etherscan labels","https://etherscan.io/accounts/label/nexo"]},{"id":"rot","name":"Whale \"BTC to ETH\"","role":"Unnamed whale rotating BTC into ETH","group":"Whales","kind":"crypto","wallets":[],"src":["TechFlow / Lookonchain","https://www.techflowpost.com/en-US/newsletter/140960"],"more":"Address not printed in the source"},{"id":"dip","name":"Whale 0x8E8b","role":"Unnamed whale buying dips","group":"Whales","kind":"crypto","wallets":[["0x8E8b\u2026","shortened in source","ethereum"]],"src":["TechFlow / Lookonchain","https://www.techflowpost.com/en-US/newsletter/140078"]},{"id":"w6436","name":"Whale 0x6436","role":"Unnamed HYPE buyer","group":"Whales","kind":"crypto","wallets":[["0x6436\u2026","shortened in source","ethereum"]],"src":["KuCoin News / Lookonchain","https://www.kucoin.com/news/flash/whale-buys-343-000-hype-tokens-worth-29-09m"]}],"events":[{"d":"2026-09-05","td":"2026-09-05","w":"w6436","t":"buy","a":"HYPE","usd":29090000,"txt":"Bought 343,000 HYPE for $29.09M","src":["KuCoin News / Lookonchain","https://www.kucoin.com/news/flash/whale-buys-343-000-hype-tokens-worth-29-09m"],"k":"crypto","key":"base-72"},{"d":"2026-09-22","td":"2026-07-24","w":"oge-trump-donald-j","t":"buy","a":"AAPL","usd":16000,"txt":"2 trades in AAPL between 2026-07-23 and 2026-07-24: bought ~$16K, sold ~$0K (range midpoints)","src":["OGE Form 278-T","https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/E590116FC9631E9885258E7A002DE209/$FILE/Donald-J-Trump-09.8.2026-278T.pdf"],"k":"stock","key":"base-73"},{"d":"2026-09-22","td":"2026-07-31","w":"oge-trump-donald-j","t":"buy","a":"ABT","usd":175000,"txt":"3 trades in ABT between 2026-07-08 and 2026-07-31: bought ~$183K, sold ~$8K (range midpoints)","src":["OGE Form 278-T","https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/E590116FC9631E9885258E7A002DE209/$FILE/Donald-J-Trump-09.8.2026-278T.pdf"],"k":"stock","key":"base-74"},{"d":"2026-09-22","td":"2026-07-27","w":"oge-trump-donald-j","t":"buy","a":"ADBE","usd":867500,"txt":"6 trades in ADBE between 2026-07-08 and 2026-07-27: bought ~$908K, sold ~$40K (range midpoints)","src":["OGE Form 278-T","https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/E590116FC9631E9885258E7A002DE209/$FILE/Donald-J-Trump-09.8.2026-278T.pdf"],"k":"stock","key":"base-75"},{"d":"2026-09-22","td":"2026-07-23","w":"oge-trump-donald-j","t":"sell","a":"AMZN","usd":14992000,"txt":"4 trades in AMZN between 2026-07-08 and 2026-07-23: bought ~$16K, sold ~$15,008K (range midpoints)","src":["OGE Form 278-T","https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/E590116FC9631E9885258E7A002DE209/$FILE/Donald-J-Trump-09.8.2026-278T.pdf"],"k":"stock","key":"base-76"},{"d":"2026-09-22","td":"2026-07-31","w":"oge-trump-donald-j","t":"buy","a":"AVGO","usd":375000,"txt":"3 trades in AVGO between 2026-07-01 and 2026-07-31: bought ~$383K, sold ~$8K (range midpoints)","src":["OGE Form 278-T","https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/E590116FC9631E9885258E7A002DE209/$FILE/Donald-J-Trump-09.8.2026-278T.pdf"],"k":"stock","key":"base-77"},{"d":"2026-09-22","td":"2026-07-31","w":"oge-trump-donald-j","t":"buy","a":"HD","usd":407500,"txt":"4 trades in HD between 2026-07-08 and 2026-07-31: bought ~$416K, sold ~$8K (range midpoints)","src":["OGE Form 278-T","https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/E590116FC9631E9885258E7A002DE209/$FILE/Donald-J-Trump-09.8.2026-278T.pdf"],"k":"stock","key":"base-78"},{"d":"2026-09-22","td":"2026-07-31","w":"oge-trump-donald-j","t":"buy","a":"META","usd":100000,"txt":"4 trades in META between 2026-07-08 and 2026-07-31: bought ~$183K, sold ~$83K (range midpoints)","src":["OGE Form 278-T","https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/E590116FC9631E9885258E7A002DE209/$FILE/Donald-J-Trump-09.8.2026-278T.pdf"],"k":"stock","key":"base-79"},{"d":"2026-09-22","td":"2026-07-27","w":"oge-trump-donald-j","t":"sell","a":"MSFT","usd":18508000,"txt":"9 trades in MSFT between 2026-07-08 and 2026-07-27: bought ~$282K, sold ~$18,790K (range midpoints)","src":["OGE Form 278-T","https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/E590116FC9631E9885258E7A002DE209/$FILE/Donald-J-Trump-09.8.2026-278T.pdf"],"k":"stock","key":"base-80"},{"d":"2026-09-22","td":"2026-07-27","w":"oge-trump-donald-j","t":"move","a":"NFLX","usd":449000,"txt":"6 trades in NFLX between 2026-07-08 and 2026-07-27: bought ~$183K, sold ~$266K (range midpoints)","src":["OGE Form 278-T","https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/E590116FC9631E9885258E7A002DE209/$FILE/Donald-J-Trump-09.8.2026-278T.pdf"],"k":"stock","key":"base-81"},{"d":"2026-09-22","td":"2026-07-27","w":"oge-trump-donald-j","t":"buy","a":"NOW","usd":892500,"txt":"5 trades in NOW between 2026-07-08 and 2026-07-27: bought ~$933K, sold ~$40K (range midpoints)","src":["OGE Form 278-T","https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/E590116FC9631E9885258E7A002DE209/$FILE/Donald-J-Trump-09.8.2026-278T.pdf"],"k":"stock","key":"base-82"},{"d":"2026-09-22","td":"2026-07-20","w":"oge-trump-donald-j","t":"move","a":"NVDA","usd":1508000,"txt":"3 trades in NVDA between 2026-07-17 and 2026-07-20: bought ~$750K, sold ~$758K (range midpoints)","src":["OGE Form 278-T","https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/E590116FC9631E9885258E7A002DE209/$FILE/Donald-J-Trump-09.8.2026-278T.pdf"],"k":"stock","key":"base-83"},{"d":"2026-09-22","td":"2026-07-23","w":"oge-trump-donald-j","t":"sell","a":"ORCL","usd":3175000,"txt":"2 trades in ORCL between 2026-07-20 and 2026-07-23: bought ~$0K, sold ~$3,175K (range midpoints)","src":["OGE Form 278-T","https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/E590116FC9631E9885258E7A002DE209/$FILE/Donald-J-Trump-09.8.2026-278T.pdf"],"k":"stock","key":"base-84"},{"d":"2026-09-22","td":"2026-07-31","w":"oge-trump-donald-j","t":"buy","a":"PG","usd":358500,"txt":"4 trades in PG between 2026-07-08 and 2026-07-31: bought ~$391K, sold ~$32K (range midpoints)","src":["OGE Form 278-T","https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/E590116FC9631E9885258E7A002DE209/$FILE/Donald-J-Trump-09.8.2026-278T.pdf"],"k":"stock","key":"base-85"},{"d":"2026-09-22","td":"2026-07-23","w":"oge-trump-donald-j","t":"move","a":"PLTR","usd":73000,"txt":"3 trades in PLTR between 2026-07-17 and 2026-07-23: bought ~$40K, sold ~$32K (range midpoints)","src":["OGE Form 278-T","https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/E590116FC9631E9885258E7A002DE209/$FILE/Donald-J-Trump-09.8.2026-278T.pdf"],"k":"stock","key":"base-86"},{"d":"2026-09-22","td":"2026-07-27","w":"oge-trump-donald-j","t":"buy","a":"TSLA","usd":102000,"txt":"4 trades in TSLA between 2026-07-17 and 2026-07-27: bought ~$175K, sold ~$73K (range midpoints)","src":["OGE Form 278-T","https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/E590116FC9631E9885258E7A002DE209/$FILE/Donald-J-Trump-09.8.2026-278T.pdf"],"k":"stock","key":"base-87"},{"d":"2026-09-22","td":"2026-07-31","w":"oge-trump-donald-j","t":"sell","a":"V","usd":200000,"txt":"2 trades in V between 2026-07-16 and 2026-07-31: bought ~$175K, sold ~$375K (range midpoints)","src":["OGE Form 278-T","https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/E590116FC9631E9885258E7A002DE209/$FILE/Donald-J-Trump-09.8.2026-278T.pdf"],"k":"stock","key":"base-88"},{"d":"2026-10-13","td":"2026-10-13","w":"dip","t":"sell","a":"ETH","usd":4930000,"txt":"Sold 2,050 ETH, locking in a $1.08M profit","src":["TechFlow / Lookonchain","https://www.techflowpost.com/en-US/newsletter/140078"],"k":"crypto","key":"base-89"},{"d":"2026-10-14","td":"2026-10-14","w":"wintermute","t":"move","a":"BTC","usd":96770000,"txt":"Sent 1,162 BTC to five fresh wallets over 12 hours","src":["KuCoin News / Lookonchain","https://www.kucoin.com/news/flash/three-new-wallets-receive-1-090-btc-worth-90m-from-wintermute"],"k":"crypto","key":"base-90"},{"d":"2026-10-15","td":"2026-10-15","w":"dip","t":"buy","a":"ETH","usd":14230000,"txt":"Bought 6,010 ETH for $14.23M on the dip","src":["TechFlow / Lookonchain","https://www.techflowpost.com/en-US/newsletter/140078"],"k":"crypto","key":"base-91"},{"d":"2026-10-17","td":"2026-10-17","w":"rot","t":"sell","a":"BTC","usd":138400000,"txt":"Over 11 days sold 1,671 BTC and bought 56,259 ETH","src":["TechFlow / Lookonchain","https://www.techflowpost.com/en-US/newsletter/140960"],"k":"crypto","key":"base-92"},{"d":"2026-10-17","td":"2026-10-17","w":"rot","t":"buy","a":"ETH","usd":134400000,"txt":"Bought ETH with the BTC proceeds","src":["TechFlow / Lookonchain","https://www.techflowpost.com/en-US/newsletter/140960"],"k":"crypto","key":"base-93"},{"d":"2026-10-21","td":"2026-10-21","w":"wintermute","t":"move","a":"BTC","usd":90380000,"txt":"Sent 1,089.77 BTC to three new wallets after test transactions","src":["KuCoin News / Lookonchain","https://www.kucoin.com/news/flash/three-new-wallets-receive-1-090-btc-worth-90m-from-wintermute"],"k":"crypto","key":"base-94"},{"d":"2026-10-22","td":"2026-10-22","w":"rot","t":"sell","a":"BTC","usd":20640000,"txt":"Sold another 246.25 BTC ($20.64M)","src":["TechFlow / Lookonchain","https://www.techflowpost.com/en-US/newsletter/140960"],"k":"crypto","key":"base-95"},{"d":"2026-10-22","td":"2026-10-22","w":"rot","t":"buy","a":"ETH","usd":20640000,"txt":"Bought 8,286 ETH ($20.64M)","src":["TechFlow / Lookonchain","https://www.techflowpost.com/en-US/newsletter/140960"],"k":"crypto","key":"base-96"}],"px":{"META":[["2026-04-01",579.23],["2026-04-06",573.02],["2026-04-13",634.53],["2026-04-20",670.91],["2026-04-27",678.62],["2026-05-04",610.41],["2026-05-11",598.86],["2026-05-18",611.21],["2026-05-26",612.34],["2026-06-01",600.47],["2026-06-08",585.39],["2026-06-15",593.48],["2026-06-22",563.85],["2026-06-29",562.6],["2026-07-06",600.29],["2026-07-13",656.73],["2026-07-20",645.85],["2026-07-27",593.87],["2026-08-03",590.24],["2026-08-10",594.92],["2026-08-17",568.97],["2026-08-24",559.02],["2026-08-31",572.34],["2026-09-08",613.48],["2026-09-14",665.6],["2026-09-21",741.25],["2026-09-28",715.62],["2026-10-05",741.9],["2026-10-12",742.96],["2026-10-19",705.44],["2026-10-22",648.85]],"AMZN":[["2026-04-01",210.57],["2026-04-06",212.79],["2026-04-13",239.89],["2026-04-20",248.28],["2026-04-27",261.12],["2026-05-04",272.05],["2026-05-11",268.99],["2026-05-18",264.86],["2026-05-26",265.29],["2026-06-01",261.26],["2026-06-08",245.22],["2026-06-15",246.02],["2026-06-22",232.79],["2026-06-29",240.14],["2026-07-06",244.16],["2026-07-13",247.31],["2026-07-20",249.99],["2026-07-27",231.39],["2026-08-03",284.02],["2026-08-10",278.09],["2026-08-17",261.31],["2026-08-24",262.07],["2026-08-31",259.77],["2026-09-08",256.97],["2026-09-14",253.54],["2026-09-21",258.45],["2026-09-28",246.15],["2026-10-05",251.4],["2026-10-12",259.53],["2026-10-19",262.45],["2026-10-22",250.38]],"NVDA":[["2026-04-01",175.75],["2026-04-06",177.64],["2026-04-13",189.31],["2026-04-20",202.06],["2026-04-27",216.61],["2026-05-04",198.48],["2026-05-11",219.44],["2026-05-18",222.32],["2026-05-26",214.86],["2026-06-01",224.36],["2026-06-08",208.64],["2026-06-15",212.45],["2026-06-22",208.65],["2026-06-29",194.97],["2026-07-06",195.55],["2026-07-13",203.53],["2026-07-20",203.28],["2026-07-27",196.51],["2026-08-03",206.64],["2026-08-10",217.55],["2026-08-17",225.01],["2026-08-24",208.48],["2026-08-31",220.78],["2026-09-08",225.73],["2026-09-14",210.96],["2026-09-21",227.38],["2026-09-28",228.86],["2026-10-05",238.9],["2026-10-12",226.32],["2026-10-19",217.09],["2026-10-22",213.8]],"HD":[["2026-04-01",329.56],["2026-04-06",326.65],["2026-04-13",341.16],["2026-04-20",350.99],["2026-04-27",332.3],["2026-05-04",312.42],["2026-05-11",311.4],["2026-05-18",299.81],["2026-05-26",310.54],["2026-06-01",310.69],["2026-06-08",309.71],["2026-06-15",329.82],["2026-06-22",326.62],["2026-06-29",350.81],["2026-07-06",350.65],["2026-07-13",337.11],["2026-07-20",333.04],["2026-07-27",336.09],["2026-08-03",340.02],["2026-08-10",350.78],["2026-08-17",337.88],["2026-08-24",337.43],["2026-08-31",327.83],["2026-09-08",313.7],["2026-09-14",310.87],["2026-09-21",297.2],["2026-09-28",289.89],["2026-10-05",281.15],["2026-10-12",290.62],["2026-10-19",309.88],["2026-10-22",327.73]],"NFLX":[["2026-04-01",95.55],["2026-04-06",98.93],["2026-04-13",103.16],["2026-04-20",94.83],["2026-04-27",91.37],["2026-05-04",91.02],["2026-05-11",85.45],["2026-05-18",89.65],["2026-05-26",87.68],["2026-06-01",85.85],["2026-06-08",82.64],["2026-06-15",81.67],["2026-06-22",72.88],["2026-06-29",73.78],["2026-07-06",76.02],["2026-07-13",73.83],["2026-07-20",67.6],["2026-07-27",70.4],["2026-08-03",73.33],["2026-08-10",76.29],["2026-08-17",76.02],["2026-08-24",80.01],["2026-08-31",81.05],["2026-09-08",76.77],["2026-09-14",80.32],["2026-09-21",73.36],["2026-09-28",69.23],["2026-10-05",67.5],["2026-10-12",70.61],["2026-10-19",69.85],["2026-10-22",67.05]],"V":[["2026-04-01",298.51],["2026-04-06",303.33],["2026-04-13",309.39],["2026-04-20",313.94],["2026-04-27",309.65],["2026-05-04",326.85],["2026-05-11",323.86],["2026-05-18",332.64],["2026-05-26",326.48],["2026-06-01",322.77],["2026-06-08",319.67],["2026-06-15",323.82],["2026-06-22",326.6],["2026-06-29",341.65],["2026-07-06",357.25],["2026-07-13",357.75],["2026-07-20",360.57],["2026-07-27",362.53],["2026-08-03",365.67],["2026-08-10",361.32],["2026-08-17",358.84],["2026-08-24",382.41],["2026-08-31",379.37],["2026-09-08",368.64],["2026-09-14",375.28],["2026-09-21",369.95],["2026-09-28",367.74],["2026-10-05",369.71],["2026-10-12",389.27],["2026-10-19",402.92],["2026-10-22",414.34]],"PG":[["2026-04-01",144.09],["2026-04-06",142.77],["2026-04-13",143.58],["2026-04-20",144.49],["2026-04-27",148.4],["2026-05-04",143.42],["2026-05-11",143.36],["2026-05-18",142.39],["2026-05-26",142.96],["2026-06-01",140.28],["2026-06-08",145.1],["2026-06-15",150.46],["2026-06-22",147.68],["2026-06-29",148.45],["2026-07-06",149.31],["2026-07-13",148.37],["2026-07-20",149.13],["2026-07-27",148.63],["2026-08-03",144.97],["2026-08-10",146.44],["2026-08-17",143.12],["2026-08-24",146.6],["2026-08-31",145.12],["2026-09-08",145.58],["2026-09-14",146.13],["2026-09-21",146.08],["2026-09-28",149.03],["2026-10-05",145.94],["2026-10-12",153.2],["2026-10-19",157.69],["2026-10-22",165.59]],"ADBE":[["2026-04-01",241.37],["2026-04-06",244.36],["2026-04-13",240.11],["2026-04-20",248.63],["2026-04-27",239.31],["2026-05-04",253.96],["2026-05-11",246.15],["2026-05-18",255.64],["2026-05-26",240.49],["2026-06-01",274.03],["2026-06-08",244.99],["2026-06-15",206.36],["2026-06-22",194.9],["2026-06-29",206.43],["2026-07-06",218.07],["2026-07-13",230.61],["2026-07-20",234.74],["2026-07-27",237.75],["2026-08-03",251.34],["2026-08-10",272.96],["2026-08-17",254.04],["2026-08-24",276.27],["2026-08-31",292.79],["2026-09-08",257.26],["2026-09-14",265.6],["2026-09-21",249.52],["2026-09-28",231.01],["2026-10-05",238.79],["2026-10-12",238.14],["2026-10-19",247.09],["2026-10-22",270.55]],"MSFT":[["2026-04-01",369.37],["2026-04-06",372.88],["2026-04-13",384.37],["2026-04-20",418.07],["2026-04-27",424.82],["2026-05-04",413.62],["2026-05-11",412.66],["2026-05-18",423.54],["2026-05-26",416.03],["2026-06-01",460.52],["2026-06-08",411.74],["2026-06-15",399.76],["2026-06-22",367.34],["2026-06-29",368.57],["2026-07-06",386.74],["2026-07-13",390.99],["2026-07-20",402.29],["2026-07-27",389.1],["2026-08-03",487.65],["2026-08-10",506.06],["2026-08-17",480.35],["2026-08-24",487.31],["2026-08-31",507.29],["2026-09-08",493.95],["2026-09-14",505.41],["2026-09-21",501.61],["2026-09-28",509.22],["2026-10-05",525.18],["2026-10-12",541.15],["2026-10-19",533.52],["2026-10-22",521.08]],"ABT":[["2026-04-01",102.38],["2026-04-06",102.3],["2026-04-13",100.69],["2026-04-20",96.0],["2026-04-27",92.8],["2026-05-04",87.54],["2026-05-11",82.56],["2026-05-18",87.91],["2026-05-26",86.67],["2026-06-01",87.78],["2026-06-08",90.5],["2026-06-15",88.67],["2026-06-22",87.83],["2026-06-29",92.71],["2026-07-06",95.63],["2026-07-13",92.11],["2026-07-20",101.66],["2026-07-27",104.49],["2026-08-03",107.12],["2026-08-10",108.62],["2026-08-17",110.37],["2026-08-24",116.67],["2026-08-31",110.36],["2026-09-08",105.52],["2026-09-14",103.09],["2026-09-21",102.98],["2026-09-28",100.98],["2026-10-05",100.1],["2026-10-12",101.82],["2026-10-19",104.06],["2026-10-22",102.51]],"TSLA":[["2026-04-01",381.26],["2026-04-06",352.82],["2026-04-13",352.42],["2026-04-20",392.5],["2026-04-27",378.67],["2026-05-04",392.51],["2026-05-11",445.0],["2026-05-18",409.99],["2026-05-26",433.59],["2026-06-01",415.88],["2026-06-08",408.95],["2026-06-15",411.15],["2026-06-22",405.05],["2026-06-29",411.84],["2026-07-06",419.77],["2026-07-13",394.76],["2026-07-20",369.57],["2026-07-27",309.22],["2026-08-03",322.08],["2026-08-10",330.88],["2026-08-17",339.3],["2026-08-24",348.95],["2026-08-31",367.95],["2026-09-08",368.16],["2026-09-14",358.97],["2026-09-21",375.3],["2026-09-28",357.45],["2026-10-05",378.73],["2026-10-12",378.03],["2026-10-19",368.06],["2026-10-22",374.58]],"AVGO":[["2026-04-01",313.49],["2026-04-06",314.43],["2026-04-13",379.75],["2026-04-20",399.63],["2026-04-27",418.2],["2026-05-04",416.5],["2026-05-11",428.43],["2026-05-18",420.71],["2026-05-26",422.01],["2026-06-01",459.97],["2026-06-08",396.6],["2026-06-15",393.94],["2026-06-22",392.13],["2026-06-29",372.45],["2026-07-06",373.9],["2026-07-13",384.05],["2026-07-20",378.16],["2026-07-27",383.22],["2026-08-03",392.23],["2026-08-10",422.4],["2026-08-17",392.43],["2026-08-24",358.76],["2026-08-31",370.34],["2026-09-08",368.56],["2026-09-14",344.72],["2026-09-21",362.66],["2026-09-28",349.57],["2026-10-05",362.51],["2026-10-12",354.73],["2026-10-19",334.59],["2026-10-22",323.24]],"PLTR":[["2026-04-01",146.49],["2026-04-06",147.93],["2026-04-13",132.37],["2026-04-20",145.89],["2026-04-27",143.1],["2026-05-04",146.03],["2026-05-11",136.89],["2026-05-18",135.14],["2026-05-26",136.6],["2026-06-01",160.65],["2026-06-08",136.47],["2026-06-15",134.71],["2026-06-22",119.5],["2026-06-29",115.7],["2026-07-06",132.54],["2026-07-13",130.04],["2026-07-20",134.85],["2026-07-27",131.53],["2026-08-03",125.65],["2026-08-10",175.23],["2026-08-17",172.55],["2026-08-24",175.89],["2026-08-31",186.38],["2026-09-08",170.3],["2026-09-14",173.31],["2026-09-21",183.09],["2026-09-28",187.48],["2026-10-05",189.4],["2026-10-12",209.0],["2026-10-19",194.15],["2026-10-22",196.19]],"MA":[["2026-04-01",491.65],["2026-04-06",501.5],["2026-04-13",508.58],["2026-04-20",516.65],["2026-04-27",506.43],["2026-05-04",504.74],["2026-05-11",497.81],["2026-05-18",505.79],["2026-05-26",493.01],["2026-06-01",495.25],["2026-06-08",485.67],["2026-06-15",490.64],["2026-06-22",484.09],["2026-06-29",509.64],["2026-07-06",533.1],["2026-07-13",537.7],["2026-07-20",547.44],["2026-07-27",551.71],["2026-08-03",570.97],["2026-08-10",563.17],["2026-08-17",562.26],["2026-08-24",599.86],["2026-08-31",589.31],["2026-09-08",570.89],["2026-09-14",574.42],["2026-09-21",567.65],["2026-09-28",568.26],["2026-10-05",564.59],["2026-10-12",595.09],["2026-10-19",616.4],["2026-10-22",633.21]],"NOW":[["2026-04-01",104.04],["2026-04-06",102.42],["2026-04-13",89.06],["2026-04-20",99.72],["2026-04-27",90.45],["2026-05-04",91.97],["2026-05-11",91.49],["2026-05-18",103.42],["2026-05-26",99.92],["2026-06-01",135.86],["2026-06-08",114.19],["2026-06-15",104.15],["2026-06-22",93.01],["2026-06-29",99.97],["2026-07-06",107.93],["2026-07-13",111.26],["2026-07-20",104.7],["2026-07-27",105.56],["2026-08-03",114.19],["2026-08-10",127.44],["2026-08-17",117.7],["2026-08-24",128.05],["2026-08-31",147.99],["2026-09-08",134.21],["2026-09-14",142.35],["2026-09-21",137.68],["2026-09-28",131.45],["2026-10-05",136.08],["2026-10-12",140.32],["2026-10-19",145.36],["2026-10-22",157.0]],"AAPL":[["2026-04-01",255.63],["2026-04-06",258.86],["2026-04-13",259.2],["2026-04-20",273.05],["2026-04-27",267.61],["2026-05-04",276.83],["2026-05-11",292.68],["2026-05-18",297.84],["2026-05-26",308.33],["2026-06-01",306.31],["2026-06-08",301.54],["2026-06-15",296.42],["2026-06-22",297.01],["2026-06-29",281.74],["2026-07-06",312.66],["2026-07-13",317.31],["2026-07-20",326.59],["2026-07-27",336.91],["2026-08-03",303.42],["2026-08-10",308.26],["2026-08-17",305.59],["2026-08-24",310.34],["2026-08-31",316.85],["2026-09-08",316.22],["2026-09-14",333.08],["2026-09-21",338.98],["2026-09-28",338.4],["2026-10-05",332.89],["2026-10-12",340.97],["2026-10-19",342.94],["2026-10-22",348.22]],"BTC":[["2026-04-06",68859.83],["2026-04-13",74484.64],["2026-04-20",75872.52],["2026-04-27",77366.63],["2026-05-04",79827.91],["2026-05-11",81728.3],["2026-05-18",76954.17],["2026-05-25",77279.93],["2026-06-01",71319.77],["2026-06-08",63090.59],["2026-06-15",66289.5],["2026-06-22",63952.11],["2026-06-29",60138.38],["2026-07-06",63995.02],["2026-07-13",62239.12],["2026-07-20",65230.03],["2026-07-27",63724.9],["2026-08-03",63460.9],["2026-08-10",63910.59],["2026-08-17",64506.25],["2026-08-24",78964.48],["2026-08-31",78548.63],["2026-09-07",79115.85],["2026-09-14",78163.38],["2026-09-21",86602.91],["2026-09-28",83502.61],["2026-10-05",85786.59],["2026-10-12",81762.56],["2026-10-19",81853.54],["2026-10-23",81636.0]],"ETH":[["2026-04-06",2107.76],["2026-04-13",2370.71],["2026-04-20",2315.21],["2026-04-27",2303.06],["2026-05-04",2346.4],["2026-05-11",2339.36],["2026-05-18",2128.52],["2026-05-25",2111.37],["2026-06-01",2003.22],["2026-06-08",1690.15],["2026-06-15",1794.96],["2026-06-22",1726.51],["2026-06-29",1610.21],["2026-07-06",1797.57],["2026-07-13",1773.5],["2026-07-20",1903.76],["2026-07-27",1890.61],["2026-08-03",1858.26],["2026-08-10",1871.28],["2026-08-17",1912.2],["2026-08-24",2481.83],["2026-08-31",2466.82],["2026-09-07",2490.96],["2026-09-14",2514.41],["2026-09-21",2776.47],["2026-09-28",2688.67],["2026-10-05",2711.03],["2026-10-12",2444.36],["2026-10-19",2404.82],["2026-10-23",2401.92]],"HYPE":[["2026-09-05",84.81],["2026-10-23",78.23]],"CTAS":[["2026-04-01",172.04],["2026-04-06",171.69],["2026-04-13",175.68],["2026-04-20",178.69],["2026-04-27",174.04],["2026-05-04",166.89],["2026-05-11",164.67],["2026-05-18",174.51],["2026-05-26",171.09],["2026-06-01",172.9],["2026-06-08",173.65],["2026-06-15",174.74],["2026-06-22",169.45],["2026-06-29",169.08],["2026-07-06",178.24],["2026-07-13",183.75],["2026-07-20",201.8],["2026-07-27",210.98],["2026-08-03",204.01],["2026-08-10",202.71],["2026-08-17",197.82],["2026-08-24",207.4],["2026-08-31",201.79],["2026-09-08",200.5],["2026-09-14",200.82],["2026-09-21",196.88],["2026-09-28",200.58],["2026-10-05",195.4],["2026-10-12",205.23],["2026-10-19",212.3],["2026-10-22",224.04]],"HOOD":[["2026-04-01",70.11],["2026-04-06",69.78],["2026-04-13",71.67],["2026-04-20",91.28],["2026-04-27",83.95],["2026-05-04",76.55],["2026-05-11",80.78],["2026-05-18",77.15],["2026-05-26",74.09],["2026-06-01",90.73],["2026-06-08",85.04],["2026-06-15",98.12],["2026-06-22",105.71],["2026-06-29",101.83],["2026-07-06",117.55],["2026-07-13",109.86],["2026-07-20",99.28],["2026-07-27",95.65],["2026-08-03",90.34],["2026-08-10",94.52],["2026-08-17",96.25],["2026-08-24",103.62],["2026-08-31",104.81],["2026-09-08",117.34],["2026-09-14",114.33],["2026-09-21",123.3],["2026-09-28",116.46],["2026-10-05",114.11],["2026-10-12",109.22],["2026-10-19",96.52],["2026-10-22",96.58]],"UNH":[["2026-04-01",273.98],["2026-04-06",281.36],["2026-04-13",313.0],["2026-04-20",323.48],["2026-04-27",354.69],["2026-05-04",370.75],["2026-05-11",384.44],["2026-05-18",391.13],["2026-05-26",376.86],["2026-06-01",379.86],["2026-06-08",406.57],["2026-06-15",411.04],["2026-06-22",406.68],["2026-06-29",419.82],["2026-07-06",417.99],["2026-07-13",429.09],["2026-07-20",421.55],["2026-07-27",417.64],["2026-08-03",415.36],["2026-08-10",408.74],["2026-08-17",395.62],["2026-08-24",398.76],["2026-08-31",389.41],["2026-09-08",400.84],["2026-09-14",383.55],["2026-09-21",377.56],["2026-09-28",377.83],["2026-10-05",378.58],["2026-10-12",378.52],["2026-10-19",406.88],["2026-10-22",424.98]],"ORCL":[["2026-04-01",145.23],["2026-04-06",145.54],["2026-04-13",155.62],["2026-04-20",177.58],["2026-04-27",172.96],["2026-05-04",180.29],["2026-05-11",193.84],["2026-05-18",186.61],["2026-05-26",193.06],["2026-06-01",248.15],["2026-06-08",211.82],["2026-06-15",192.64],["2026-06-22",175.07],["2026-06-29",147.76],["2026-07-06",143.76],["2026-07-13",131.54],["2026-07-20",121.38],["2026-07-27",119.9],["2026-08-03",141.85],["2026-08-10",151.05],["2026-08-17",146.65],["2026-08-24",142.45],["2026-08-31",149.12],["2026-09-08",162.52],["2026-09-14",144.79],["2026-09-21",148.56],["2026-09-28",132.6],["2026-10-05",142.48],["2026-10-12",137.39],["2026-10-19",129.59],["2026-10-22",125.54]],"OKTA":[["2026-04-01",79.14],["2026-04-06",80.56],["2026-04-13",65.46],["2026-04-20",75.76],["2026-04-27",76.14],["2026-05-04",77.24],["2026-05-11",81.69],["2026-05-18",87.04],["2026-05-26",93.81],["2026-06-01",139.79],["2026-06-08",116.85],["2026-06-15",118.12],["2026-06-22",115.94],["2026-06-29",131.31],["2026-07-06",148.6],["2026-07-13",139.53],["2026-07-20",148.41],["2026-07-27",137.43],["2026-08-03",141.57],["2026-08-10",150.77],["2026-08-17",143.24],["2026-08-24",130.97],["2026-08-31",173.04],["2026-09-08",167.6],["2026-09-14",186.45],["2026-09-21",191.33],["2026-09-28",202.18],["2026-10-05",218.29],["2026-10-12",227.08],["2026-10-19",189.93],["2026-10-22",201.33]],"ABNB":[["2026-04-01",125.19],["2026-04-06",126.81],["2026-04-13",130.32],["2026-04-20",143.59],["2026-04-27",141.06],["2026-05-04",138.86],["2026-05-11",137.05],["2026-05-18",134.3],["2026-05-26",132.68],["2026-06-01",137.87],["2026-06-08",134.43],["2026-06-15",138.96],["2026-06-22",139.19],["2026-06-29",147.17],["2026-07-06",147.65],["2026-07-13",146.33],["2026-07-20",144.94],["2026-07-27",146.86],["2026-08-03",150.64],["2026-08-10",184.7],["2026-08-17",179.29],["2026-08-24",190.21],["2026-08-31",183.22],["2026-09-08",174.54],["2026-09-14",170.65],["2026-09-21",166.84],["2026-09-28",156.08],["2026-10-05",164.07],["2026-10-12",163.5],["2026-10-19",175.46],["2026-10-22",175.76]],"FOUR":[["2026-04-01",42.61],["2026-04-06",42.24],["2026-04-13",45.47],["2026-04-20",49.32],["2026-04-27",45.0],["2026-05-04",43.99],["2026-05-11",41.47],["2026-05-18",42.5],["2026-05-26",42.79],["2026-06-01",45.21],["2026-06-08",37.66],["2026-06-15",39.94],["2026-06-22",38.57],["2026-06-29",48.23],["2026-07-06",51.38],["2026-07-13",49.23],["2026-07-20",50.87],["2026-07-27",49.97],["2026-08-03",54.28],["2026-08-10",43.16],["2026-08-17",44.35],["2026-08-24",48.0],["2026-08-31",42.28],["2026-09-08",42.29],["2026-09-14",45.32],["2026-09-21",39.37],["2026-09-28",37.03],["2026-10-05",37.55],["2026-10-12",39.85],["2026-10-19",39.77],["2026-10-22",40.17]],"SPY":[["2026-04-01",655.24],["2026-04-06",658.93],["2026-04-13",686.1],["2026-04-20",708.72],["2026-04-27",715.17],["2026-05-04",718.01],["2026-05-11",739.3],["2026-05-18",738.65],["2026-05-26",750.59],["2026-06-01",758.54],["2026-06-08",739.22],["2026-06-15",754.83],["2026-06-22",744.39],["2026-06-29",741.0],["2026-07-06",751.28],["2026-07-13",749.17],["2026-07-20",742.09],["2026-07-27",739.09],["2026-08-03",757.67],["2026-08-10",773.03],["2026-08-17",772.67],["2026-08-24",763.47],["2026-08-31",767.05],["2026-09-08",765.96],["2026-09-14",760.88],["2026-09-21",773.5],["2026-09-28",765.61],["2026-10-05",774.83],["2026-10-12",778.1],["2026-10-19",766.48],["2026-10-22",763.96]]},"crypto":["BTC","ETH","HYPE"]}</script>
 <script>
@@ -184,10 +192,10 @@ dialog label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px}
 const P={CAPITAL:10000,WIN:30,THR:.6,HALF_LIFE:10,
   TIERS:[[10e6,"large",.16,1],[1e6,"medium",.08,.5],[50e3,"regular",.03,.25],[0,"small",.015,.25]],BIG:50e3,
   STOP:-.15,TRAIL_K:2.5,TRAIL_MIN:.10,TRAIL_MAX:.25,TP_LEVEL:.30,TP_FRAC:1/3,
-  MAX_ASSET:.15,MAX_ASSET_CRYPTO:.10,MAX_CRYPTO:.60,MIN_CASH:.20,DAY_LOSS:-.04,KILL:-.20,
-  MIN_TRADE:100,HOLD_W:.04,COOLDOWN:3600e3,FEE_CRYPTO:.0008,FEE_STOCK:.0002,CASH_APY:.035,MIN_LIQ:10e6,TRIM_MIN:.3,TARGET_VOL:.45,CHASE_SKIP:.20,CHASE_HALF:.10,HIT_H:20,STALE:120};
+  MAX_ASSET:.15,MAX_ASSET_CRYPTO:.10,MAX_CRYPTO:.60,MIN_CASH:.10,DAY_LOSS:-.04,KILL:-.20,
+  MIN_TRADE:100,HOLD_W:.04,COOLDOWN:3600e3,FEE_CRYPTO:.0008,FEE_STOCK:.0002,CASH_APY:.035,MIN_LIQ:10e6,MIN_BOOK:5e3,MAX_N:25,MAX_PLAYER:.12,MIN_W:.015,BAND:.25,TARGET_VOL:.45,CHASE_SKIP:.20,CHASE_HALF:.10,HIT_H:20,STALE:120};
 const WATCH_GROUPS=new Set(["Market makers"]);
-const KEY="quantum-trade-live-v1";
+const KEY="quantum-trade-live-v2";
 const DAY=864e5;
 const dn=s=>Math.floor(Date.parse(s.slice(0,10)+"T00:00:00Z")/DAY);
 const iso=n=>new Date(n*DAY).toISOString().slice(0,10);
@@ -202,7 +210,7 @@ let S=null;
 function freshState(){
   return {acc:null,trades:[],seen:{},score:{},pending:[],log:[],curve:[],live:{},snaps:{},scout:[],
     players:JSON.parse(JSON.stringify(SEED.players)),events:SEED.events.map(e=>({...e})),px:JSON.parse(JSON.stringify(SEED.px)),
-    crypto:SEED.crypto.slice(),ocDay:null,candleDay:null,scoutDay:null,wallTs:0,proxy:null};
+    crypto:SEED.crypto.slice(),books:{},block:{},feed:[],ocDay:null,candleDay:null,scoutDay:null,wallTs:0,proxy:null};
 }
 function load(){try{const t=localStorage.getItem(KEY);if(t)return JSON.parse(t)}catch(e){}return null}
 let saveWarned=false;
@@ -287,88 +295,68 @@ function trade(a,side,v,why,sig){
   acc.fees+=fee;
   const tr={ts:nowTs(),d:t,a,side,v:+v.toFixed(2),q,px:p_,why};if(sig)tr.sig=sig;if(pl!==null)tr.pl=+pl.toFixed(2);
   S.trades.push(tr);if(S.trades.length>1000)S.trades=S.trades.slice(-1000);
-  notifyTrade(tr,"Long-term");
+  feedPush("trade",`${{buy:"Bought",sell:"Sold"}[side]} ${a} · ${usd(v)} at ${usd(p_)}`+(pl!==null?` · ${pl>=0?"+":"−"}${usd(Math.abs(pl))}`:""),why,side==="buy"?"buy":pl!==null&&pl>=0?"buy":"sell");
 }
-function notifyTrade(tr,book){
-  const box=document.getElementById("tstack");if(!box)return;
-  const d=document.createElement("div");d.className="tnote"+(tr.side==="sell"||tr.side==="short"?" sell":"");
-  const verb={buy:"Bought",sell:"Sold",short:"Shorted",cover:"Covered"}[tr.side]||tr.side;
-  d.innerHTML=`<div><b>${verb} ${esc(tr.a)}</b> · <span class="num">${usd(tr.v)}</span> at <span class="num">${usd(tr.px)}</span>${tr.pl!=null?` · <span class="num ${cls(tr.pl)}">${usd(tr.pl)}</span>`:""}</div><div class="why">${esc(book)}: ${esc(tr.why)}</div>`;
-  box.prepend(d);while(box.children.length>4)box.lastChild.remove();
-  setTimeout(()=>d.remove(),6000);
-}
-function notifyText(title,why,sell,muted){const box=document.getElementById("tstack");if(!box)return;const d=document.createElement("div");
-  d.className="tnote"+(sell?" sell":"")+(muted?" muted":"");d.innerHTML=`<div><b>${esc(title)}</b></div><div class="why">${esc(why)}</div>`;
-  box.prepend(d);while(box.children.length>4)box.lastChild.remove();setTimeout(()=>d.remove(),6000)}
+function feedPush(kind,title,why,cls){S.feed=S.feed||[];S.feedN=(S.feedN||0)+1;S.feed.push({id:S.feedN,ts:nowTs(),kind,title,why,cls});if(S.feed.length>300)S.feed=S.feed.slice(-300)}
 function trail(a){const v=vol(a);if(!v)return P.TRAIL_MIN*1.5;return Math.min(P.TRAIL_MAX,Math.max(P.TRAIL_MIN,P.TRAIL_K*v*Math.sqrt(7/365)))}
-function exits(skip){
-  const acc=S.acc,t=today();
-  for(const a of Object.keys(acc.pos)){
-    const p=acc.pos[a],n=pxNow(a);if(!n)continue;const gain=n/p.avg-1;
-    if(gain<=P.STOP){trade(a,"sell",p.q*n,"Stop-loss: down 15% from average cost");continue}
-    const tr=trail(a);
-    if(n/p.hi-1<=-tr){trade(a,"sell",p.q*n,`Trailing stop: ${pc(tr)} below the high since entry`);continue}
-    if(gain>=P.TP_LEVEL&&!p.tp){p.tp=true;trade(a,"sell",p.q*n*P.TP_FRAC,`Take profit: up ${pc(gain)}, sold a third`);continue}
-    for(const e of S.events)if(e.a===a&&e.t==="buy"&&!skip.has(e.w)&&e.d<=t&&e.d>(p.sig||p.opened))p.sig=e.d;
-    if(dn(t)-dn(p.sig||p.opened)>P.STALE)trade(a,"sell",p.q*n,"No fresh buying by tracked players for 120 days");
-  }
+function exits(){
+  const acc=S.acc;
+  for(const a of Object.keys(acc.pos)){const p=acc.pos[a],n=pxNow(a);if(!n)continue;const tr=trail(a);
+    const why=n/p.avg-1<=P.STOP?"Stop-loss: down 15% from average cost":n/p.hi-1<=-tr?`Trailing stop: ${pc(tr)} below the high since the bot bought`:"";
+    if(why){trade(a,"sell",p.q*n,why+". Not bought back for 3 days");S.block[a]=Date.now()+3*DAY}}
 }
 function accrueCash(){const now=Date.now(),a=S.acc;if(!a)return;const last=a.yTs||now;a.yTs=now;
-  const k=P.CASH_APY*Math.min(now-last,7*DAY)/(365*DAY);if(k<=0)return;
-  const x=a.cash*k;a.cash+=x;a.interest=(a.interest||0)+x;
-  if(S.micro){const y=S.micro.cash*k;S.micro.cash+=y;a.interest+=y;S.micro.book.push([now,y]);if(S.micro.book.length>5000)S.micro.book=S.micro.book.slice(-5000)}
+  const k=P.CASH_APY*Math.min(now-last,7*DAY)/(365*DAY);if(k>0){const x=a.cash*k;a.cash+=x;a.interest=(a.interest||0)+x}
   a.bench=a.bench||{};for(const b of ["BTC","SPY"])if(!a.bench[b]&&S.live[b])a.bench[b]=S.live[b]}
+/* The copied portfolio: every tracked player gets a vote budget (track record × size of their book, log scale),
+   split over what they hold now in proportion to dollars. Shorts subtract. Then caps are applied. */
+function tradable(a){if(STABLE.has(a)||(S.block[a]||0)>Date.now())return false;
+  if(isCrypto(a)||S.mkt?.[a])return !!S.live[a]&&(!S.mkt||S.mkt[a]?.vlm>=P.MIN_LIQ);
+  return /^[A-Z]{1,4}(\.[A-Z])?$/.test(a)}   // 5-letter mutual funds are retirement savings, not a view
+function target(){
+  const skip=skipSet(),sc={},who={},vot=[];let tot=0,np=0;
+  for(const p of S.players){const b=S.books[p.id];if(skip.has(p.id)||!b)continue;
+    const h=Object.entries(b.h).filter(([a])=>tradable(a)),gross=h.reduce((s,[,v])=>s+Math.abs(v),0);if(gross<P.MIN_BOOK)continue;
+    vot.push([p,h,gross,weight(p.id)*Math.log10(1+gross/1e4)])}
+  for(let it=0;it<6;it++){const s=vot.reduce((t,v)=>t+v[3],0);for(const v of vot)v[3]=Math.min(v[3],P.MAX_PLAYER*s)}  // no single player steers more than 12%
+  for(const [p,h,gross,bud] of vot){tot+=bud;np++;
+    for(const [a,v] of h){const x=bud*v/gross;sc[a]=(sc[a]||0)+x;if(v>0)(who[a]=who[a]||[]).push([p.name,x])}}
+  let w=Object.entries(sc).filter(([,x])=>x>0).sort((a,b)=>b[1]-a[1]).slice(0,P.MAX_N);
+  const f={};let s=w.reduce((t,[,x])=>t+x,0);for(const [a,x] of w)f[a]=x/s;
+  const fill=()=>{for(let it=0;it<12;it++){      // fit caps: 15% per asset, 60% all crypto, rest spread over the others
+    let inv=0,cr=0;for(const a in f){f[a]=Math.min(f[a],P.MAX_ASSET);inv+=f[a];if(isCrypto(a))cr+=f[a]}
+    if(cr>P.MAX_CRYPTO)for(const a in f)if(isCrypto(a))f[a]*=P.MAX_CRYPTO/cr;
+    inv=Object.values(f).reduce((t,x)=>t+x,0);const free=Object.keys(f).filter(a=>f[a]<P.MAX_ASSET-1e-9&&!(isCrypto(a)&&cr>=P.MAX_CRYPTO-1e-9));
+    const room=1-P.MIN_CASH-inv,fs=free.reduce((t,a)=>t+f[a],0);if(room<1e-6||!fs)break;for(const a of free)f[a]*=1+room/fs}};
+  for(let r=0;r<4;r++){fill();let cut=false;for(const a in f)if(f[a]<P.MIN_W){delete f[a];cut=true}if(!cut)break}
+  for(const a in who)who[a].sort((x,y)=>y[1]-x[1]);
+  return {f,who,np,raw:Object.fromEntries(w.map(([a,x])=>[a,x/tot]))};
+}
+let ready=false;   // trade only after every source has loaded once, so a half-built target never causes buy-then-sell churn
+function rebalance(braked){
+  const acc=S.acc,E=equity(),T=target();
+  S.target={ts:nowTs(),np:T.np,rows:Object.entries(T.f).sort((a,b)=>b[1]-a[1]).map(([a,f])=>[a,f,(T.who[a]||[]).slice(0,3).map(x=>x[0]),(T.who[a]||[]).length])};
+  const whoTxt=a=>{const w=T.who[a]||[];return w.slice(0,3).map(x=>x[0]).join(", ")+(w.length>3?` and ${w.length-3} more`:"")};
+  for(const a of Object.keys(acc.pos)){const n=pxNow(a);if(!n)continue;const cur=acc.pos[a].q*n,tv=E*(T.f[a]||0),x=cur-tv;
+    if(ready&&x>Math.max(P.MIN_TRADE,P.BAND*cur))trade(a,"sell",tv<P.MIN_TRADE?cur:x,T.f[a]?`Players cut ${a}: now ${pc(T.f[a],1)} of the copied portfolio (${whoTxt(a)})`:`Tracked players no longer hold ${a}`)}
+  if(braked||!ready)return;
+  const gaps=Object.entries(T.f).map(([a,f])=>[a,f,E*f-(acc.pos[a]?acc.pos[a].q*(pxNow(a)||0):0)]).sort((x,y)=>y[2]-x[2]);
+  for(const [a,f,gap] of gaps){if(!S.live[a])continue;const tv=E*f;
+    if(gap<=Math.max(P.MIN_TRADE,P.BAND*tv))continue;const v=Math.min(gap,acc.cash-E*P.MIN_CASH);if(v<P.MIN_TRADE)break;
+    trade(a,"buy",v,`Copying ${whoTxt(a)}: ${pc(f,1)} of the copied portfolio`)}
+}
 function step(){
-  if(!S.acc)openAccount();accrueCash();
-  const acc=S.acc,t=today(),skip=skipSet(),names=Object.fromEntries(S.players.map(p=>[p.id,p.name]));
+  if(!S.acc)openAccount();accrueCash();S.block=S.block||{};S.books=S.books||{};
+  const acc=S.acc,t=today();
   for(const k in acc.pos){const p=acc.pos[k],n=pxNow(k);if(n){p.last=n;p.hi=Math.max(p.hi||n,n)}}
   if(acc.day!==t){acc.day=t;acc.dayEq=equity()}
   grade();
-  const queued=new Set(S.pending.map(x=>x[0]));
-  for(const e of S.events){if(S.seen[e.key]||queued.has(e.key)||e.t==="move"||e.hold)continue;
-    const p0=pxAt(e.a,e.d);if(p0){S.pending.push([e.key,e.w,e.a,e.t,e.d,p0]);queued.add(e.key)}}
-  const active=acc.botOn&&!acc.paused&&!acc.cashedOut;
-  if(!active){for(const e of S.events)S.seen[e.key]=1;return}
-  exits(skip);
-  const braked=equity()/acc.dayEq-1<=P.DAY_LOSS;
-  // copy what tracked officials already hold (stocks), once per ticker
-  S.holdDone=S.holdDone||{};
-  for(const x of S.holdings||[]){if(braked||S.holdDone[x.a]||acc.pos[x.a]||isCrypto(x.a))continue;if(!S.live[x.a])continue;   // wait for a live quote, seed prices can be weeks old
-    
-    const E=equity(),v=Math.min(E*P.HOLD_W,E*P.MAX_ASSET,acc.cash-E*P.MIN_CASH);S.holdDone[x.a]=1;
-    if(v<P.MIN_TRADE){logMsg(`Holding ${x.a}: no free cash above the 20% floor`);continue}
-    trade(x.a,"buy",v,`copied holding: ${x.who.join(", ")}${x.n>3?" and others":""} bought net $${(x.net/1e3).toFixed(0)}K in 120 days`)}
-  for(const e of [...S.events].sort((x,y)=>x.d<y.d?-1:1)){
-    if(S.seen[e.key])continue;
-    if(e.t==="move"||skip.has(e.w)||e.d>t||dn(e.d)<dn(t)-3){S.seen[e.key]=1;continue}
-    const a=e.a;
-    if(!pxNow(a))continue;                 // wait for a price, retry next round
-    S.seen[e.key]=1;
-    const c=consensus(a,skip);
-    const [kname,buyF,sellF]=tier(e.usd),who=names[e.w]||e.w,[mult,why]=checks(e);
-    if(mult===0){logMsg(`${who} ${e.t} ${a}: skipped, ${why}`);continue}
-    // follow every proven player; others only veto (60% of players and money the other way) or boost size when they agree
-    const opp=c&&(e.t==="buy"?c.sell>=P.THR&&c.vs>=P.THR:c.buy>=P.THR&&c.vb>=P.THR);
-    if(opp){logMsg(`${who} ${e.t} ${a}: skipped, ${pc(e.t==="buy"?c.sell:c.buy)} of players go the other way`);continue}
-    const agree=c&&c.n>=2?(e.t==="buy"?c.vb:c.vs):0,boost=c&&c.n>=2?.75+.75*agree:.75;
-    const note=c&&c.n>=2?`${pc(e.t==="buy"?c.buy:c.sell)} of ${c.n} players agree`:"only player on this asset";
-    if(e.t==="buy"&&isCrypto(a)&&S.mkt&&!(S.mkt[a]?.vlm>=P.MIN_LIQ)){logMsg(`${who} buy ${a}: skipped, thin market (under $10M traded a day), prices jump too much`);continue}
-    if(e.t==="buy"&&!braked){
-      const E=equity(),held=(acc.pos[a]?.q||0)*pxNow(a);
-      if(held&&e.usd<1e6&&acc.pos[a].lastBuy&&Date.now()-Date.parse(acc.pos[a].lastBuy)<P.COOLDOWN){logMsg(`${who} buy ${a}: already added to ${a} in the last hour, waiting`);continue}
-      let size=buyF*mult*weight(e.w)*boost;const v_=vol(a);if(v_)size*=Math.min(1,P.TARGET_VOL/v_);
-      const room=[E*size,E*(isCrypto(a)?P.MAX_ASSET_CRYPTO:P.MAX_ASSET)-held,acc.cash-E*P.MIN_CASH];
-      if(isCrypto(a)){let cr=0;for(const k in acc.pos)if(isCrypto(k))cr+=acc.pos[k].q*acc.pos[k].last;room.push(E*P.MAX_CRYPTO-cr)}
-      const v=Math.min(...room);
-      if(v<P.MIN_TRADE){logMsg(`${who} buy ${a}: ${["size too small","asset limit reached","cash floor reached","crypto limit reached"][room.indexOf(v)]}`);continue}
-      trade(a,"buy",v,`${who}: ${kname} buy, ${note}`+(why?"; "+why:""),e.key);
-    }else if(e.t==="buy")logMsg(`${who} buy ${a}: paused, daily loss brake is on`);
-    else if(acc.pos[a]){const all=acc.pos[a].q*pxNow(a);
-      if(e.frac!=null&&e.frac<P.TRIM_MIN){logMsg(`${who} sell ${a}: trimmed only ${pc(e.frac)} of the position, keeping ours (small trims only cost fees)`);continue}
-      let v=all*Math.min(1,e.frac!=null?e.frac:sellF*mult*boost/.75);
-      if(v<P.MIN_TRADE)v=all<2*P.MIN_TRADE?all:0;   // tiny sells only waste fees: sell all of a small position or wait
-      if(v>0)trade(a,"sell",v,`${who}: ${kname} sell, ${note}`,e.key);else logMsg(`${who} sell ${a}: too small to act on`)}
-  }
+  for(const e of S.events){if(S.seen[e.key]||e.t==="move"||e.hold)continue;   // every real trade is graded after 20 days
+    const p0=pxAt(e.a,e.d);if(p0){S.pending.push([e.key,e.w,e.a,e.t,e.d,p0]);S.seen[e.key]=1}}
+  if(!(acc.botOn&&!acc.paused&&!acc.cashedOut))return;
+  exits();
+  const braked=equity()/acc.dayEq-1<=P.DAY_LOSS;if(braked)logMsg("Daily loss brake: no new buys today after a −4% day");
+  rebalance(braked);
   const E=equity();acc.peak=Math.max(acc.peak,E);
   if(E/acc.peak-1<=P.KILL){for(const a of Object.keys(acc.pos))trade(a,"sell",acc.pos[a].q*pxNow(a),"Emergency stop: account fell 20% from its peak");acc.paused=true;logMsg("Emergency stop: everything sold, bot paused")}
 }
@@ -449,13 +437,16 @@ async function ogeEvents(since){
     const hh=hold.get(a.tk)||{a:a.tk,net:0,who:new Set()};hh.net+=a.buy-a.sell;if(a.buy>a.sell)hh.who.add(a.o);hold.set(a.tk,hh)}
   const holdings=[...hold.values()].filter(x=>x.net>=50e3).map(x=>({a:x.a,net:Math.round(x.net),n:x.who.size,who:[...x.who].slice(0,3).map(o=>{const p=o.split(", ");return p.length===2?p[1]+" "+p[0]:o})}))
     .sort((x,y)=>y.net*Math.sqrt(y.n)-x.net*Math.sqrt(x.n)).slice(0,15);
-  return [ev,people,holdings];
+  const byP={};for(const a of agg.values()){const w="oge-"+slug(a.o),b=byP[w]||(byP[w]={});b[a.tk]=(b[a.tk]||0)+a.buy-a.sell}
+  for(const w in byP){for(const k in byP[w])if(byP[w][k]<1e3)delete byP[w][k];if(!Object.keys(byP[w]).length)delete byP[w]}
+  return [ev,people,holdings,byP];
 }
 
 /* ================= Collectors ================= */
 const health={hl:"",wh:"",wl:"",oc:"",st:""};
 const setH=(k,v)=>{health[k]=v;const el=document.getElementById("s-"+k);if(el)el.className="src "+v};
-function addEvent(e){if(S.events.some(x=>x.key===e.key||(x.w===e.w&&x.a===e.a&&x.d===e.d&&x.t===e.t&&x.k==="stock"&&e.k==="stock")))return false;S.events.push(e);if(e.k==="crypto"&&!S.crypto.includes(e.a))S.crypto.push(e.a);return true}
+function addEvent(e){if(S.events.some(x=>x.key===e.key||(x.w===e.w&&x.a===e.a&&x.d===e.d&&x.t===e.t&&x.k==="stock"&&e.k==="stock")))return false;S.events.push(e);
+  if(!e.hold&&e.t!=="move"&&e.d>=iso(dn(today())-1)){const nm=(S.players.find(p=>p.id===e.w)||{}).name||e.w;feedPush("signal",`${nm} ${e.t==="buy"?"bought":"sold"} ${e.a} · ${big(e.usd)}`,e.txt,"player")}if(e.k==="crypto"&&!S.crypto.includes(e.a))S.crypto.push(e.a);return true}
 const names=()=>Object.fromEntries(S.players.map(p=>[p.id,p.name]));
 
 async function pullMids(){
@@ -464,12 +455,15 @@ async function pullMids(){
   catch(e){setH("hl","bad")}
 }
 async function pullFilings(){
-  if(S.ocDay===today()&&S.holdings){setH("oc","ok");return}setH("oc","busy");
-  try{const [ev,people,holdings]=await ogeEvents(iso(dn(today())-120));const ids=new Set(S.players.map(p=>p.id));let n=0;
+  if(S.ocDay===today()){setH("oc","ok");return}setH("oc","busy");
+  try{const [ev,people,holdings,byP]=await ogeEvents(iso(dn(today())-365));const ids=new Set(S.players.map(p=>p.id));let n=0;
     S.holdings=holdings;const evLo=iso(dn(today())-40);
+    const addOfficial=w=>{if(ids.has(w))return;const nm=Object.keys(people).find(o=>"oge-"+slug(o)===w)||w,pp=nm.split(", ");
+      S.players.push({id:w,name:pp.length===2?pp[1]+" "+pp[0]:nm,role:people[nm]||"",group:"Government officials",kind:"stocks",wallets:[],src:["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],added:today()});ids.add(w)};
+    for(const w in S.books)if(w.startsWith("oge-"))delete S.books[w];
+    for(const w in byP){addOfficial(w);S.books[w]={ts:Date.now(),src:"net bought in the last 12 months (OGE 278-T)",h:byP[w]}}
     for(const e of ev){if(e.d<evLo)continue;if(addEvent(e)&&e.t!=="move")n++;
-      if(!ids.has(e.w)){const nm=Object.keys(people).find(o=>"oge-"+slug(o)===e.w)||e.w,pp=nm.split(", ");
-        S.players.push({id:e.w,name:pp.length===2?pp[1]+" "+pp[0]:nm,role:people[nm]||"",group:"Government officials",kind:"stocks",wallets:[],src:["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],added:today()});ids.add(e.w)}}
+      addOfficial(e.w)}
     if(n)logMsg(`Loaded ${n} new trades from officials' filings`);S.ocDay=today();setH("oc","ok")}
   catch(e){setH("oc","bad")}
 }
@@ -485,7 +479,7 @@ async function pullTraders(){
         const d=(pos[c]||0)-(prev[c]||0);if(Math.abs(d)*px<thr)continue;
         addEvent({key:`hl-${p.id}-${c}-${ts}`,d:t,td:t,w:p.id,a:c,t:d>0?"buy":"sell",usd:Math.round(Math.abs(d)*px),k:"crypto",frac:d<0&&(prev[c]||0)>0?Math.min(1,-d/prev[c]):undefined,
           txt:`${d>0?"Bought":"Sold"} ${Math.abs(d).toLocaleString("en-US",{maximumFractionDigits:2})} ${c} (~$${Math.round(Math.abs(d)*px).toLocaleString("en-US")}), now ${(pos[c]||0).toLocaleString("en-US",{maximumFractionDigits:2})}`,src})}
-      S.snaps[k]=pos}catch(e){}
+      S.snaps[k]=pos;for(const c in pos)if(!S.crypto.includes(c))S.crypto.push(c);S.books[p.id]={ts:Date.now(),src:"Hyperliquid positions now",h:Object.fromEntries(Object.entries(pos).map(([c,sz])=>[c,Math.round(sz*(S.live[c]||0))]).filter(([,v])=>Math.abs(v)>=1e3))}}catch(e){}
     await sleep(150)}
   setH("wh",ok?"ok":"bad");
 }
@@ -502,15 +496,17 @@ async function pullWallets(){
     for(const a in gross){const px=pxNow(a);if(!px||gross[a]*px<10e3)continue;const n=net[a],src=["Blockscout",`https://eth.blockscout.com/address/${p.wallets[0][0]}`];
       if(Math.abs(n)<.25*gross[a])addEvent({key:`wl-${p.id}-${a}-${ts}`,d:t,td:t,w:p.id,a,t:"move",usd:Math.round(gross[a]*px),k:"crypto",txt:`Moved ${a} between own wallets (net change ${n.toFixed(2)})`,src});
       else if(Math.abs(n)*px>=10e3)addEvent({key:`wl-${p.id}-${a}-${ts}`,d:t,td:t,w:p.id,a,t:n>0?"buy":"sell",usd:Math.round(Math.abs(n)*px),k:"crypto",frac:n<0&&pt[a]>0?Math.min(1,-n/pt[a]):undefined,txt:`${n>0?"Added":"Reduced"} ${Math.abs(n).toLocaleString("en-US",{maximumFractionDigits:2})} ${a} across tracked wallets (~$${Math.round(Math.abs(n)*px).toLocaleString("en-US")})`,src})}
-    S.snaps[p.id]=cur}
+    S.snaps[p.id]=cur;const h={};for(const w in cur)for(const a in cur[w])if(!S.crypto.includes(a))S.crypto.push(a);for(const w in cur)for(const a in cur[w]){const px=pxNow(a);if(px)h[a]=(h[a]||0)+cur[w][a]*px}
+    S.books[p.id]={ts:Date.now(),src:"wallet balances now",h:Object.fromEntries(Object.entries(h).map(([a,v])=>[a,Math.round(v)]).filter(([,v])=>v>=1e3))}}
   setH("wl",ok?(fail>ok?"bad":"ok"):"bad");S.wallTs=Date.now();
 }
 async function pullStocks(){
   const t=today(),recent=iso(dn(t)-3),need=new Set([...Object.keys(S.acc?.pos||{}),"SPY"]);
-  for(const x of S.holdings||[])if(!(S.holdDone||{})[x.a])need.add(x.a);
+  for(const r of S.target?.rows||[])need.add(r[0]);
+  for(const p of S.players)if(p.id.startsWith("oge-")&&S.books[p.id])for(const [a] of Object.entries(S.books[p.id].h).sort((x,y)=>y[1]-x[1]).slice(0,3))need.add(a);
   for(const e of S.events)if(e.d>=recent&&e.t!=="move")need.add(e.a);
   for(const x of S.pending)if(iso(dn(x[4])+P.HIT_H)<=iso(dn(t)+1))need.add(x[2]);
-  const stocks=[...need].filter(a=>!isCrypto(a)).slice(0,120);if(!stocks.length){setH("st","ok");return}
+  const stocks=[...need].filter(a=>!isCrypto(a)&&!S.mkt?.[a]).slice(0,150);if(!stocks.length){setH("st","ok");return}
   setH("st","busy");let ok=0;
   for(const a of stocks){const [last,hist]=await yahoo(a);if(hist.length)mergePx(a,hist);if(last){S.live[a]=last;ok++}await sleep(120)}
   setH("st",ok?"ok":"bad");
@@ -570,152 +566,17 @@ async function runScout(){
   S.scout=S.scout.slice(-200);S.scoutDay=today();
 }
 
-/* ================= Short-term book: 20-30% of the account, trades on its own (no copying) ================= */
-const M={SHARE:.20,SHARE_UP:.30,LEV:3,CARRY_MAX:4,CARRY_W:.20,CARRY_USE:.70,APR_IN:.10,APR_OUT:.03,APR_SWAP:.25,
-  CARRY_FEE:.00135,MIN_VLM:20e6,MIN_OI:10e6,PUMP:.25,MIN:100,
-  DIR_RISK:.005,DIR_MAX:2,DIR_CAP:.15,GATE_N:40,GATE_PF:1.5,GATE_AVG:3e-4,KEEP_PF:1.1,DAY_STOP:-.02,STREAK:4,PAUSE:6*36e5,
-  COINS:["BTC","ETH","SOL","HYPE"]};
-const LAB={COST:.0011,WARM:500,KEEP:7*864e5};
-const STRATS=[
-  {id:"scalp5",name:"5-min momentum scalp",how:"follows a sharp 5-minute move on heavy volume, out within 5 minutes"},
-  {id:"fade",name:"Spike fade",how:"bets against a 1-minute spike over 8× normal size, out within 1 hour"},
-  {id:"breakout",name:"4-hour breakout",how:"buys a new 4-hour high (sells a new low) on 2× volume with the 8-hour trend, out within 4 hours"},
-  {id:"snap",name:"Snap-back",how:"bets on a return to the 4-hour average after a 2.5σ stretch, out within 1 hour"}];
-function labSignal(k,B,i){ // B={t,o,h,l,c,v}; looks only at bars up to i (already closed)
-  const {h,l,c,v}=B;if(i<LAB.WARM)return null;
-  let tr=0;for(let j=i-59;j<=i;j++)tr+=Math.max(h[j]-l[j],Math.abs(h[j]-c[j-1]),Math.abs(l[j]-c[j-1]));const atr=tr/60;if(!(atr>0))return null;
-  let s1=0,vs=0;for(let j=i-240;j<i;j++){const r=Math.log(c[j]/c[j-1]);s1+=r*r;vs+=v[j]}const sd1=Math.sqrt(s1/240),va=vs/240;if(!(sd1>0))return null;
-  if(k==="scalp5"){const r5=Math.log(c[i]/c[i-5]);let v5=0;for(let j=i-4;j<=i;j++)v5+=v[j];
-    if(Math.abs(r5)>2.5*sd1*Math.sqrt(5)&&v5>10*va)return {d:Math.sign(r5),tp:2*atr,sl:1.5*atr,H:5}}
-  else if(k==="fade"){const r1=Math.log(c[i]/c[i-1]);if(Math.abs(r1)>8*sd1&&v[i]>3*va)return {d:-Math.sign(r1),tp:6*atr,sl:4*atr,H:60}}
-  else if(k==="breakout"){if(!(v[i]>2*va))return null;let hh=-Infinity,ll=Infinity,sm=0;for(let j=i-240;j<i;j++){if(h[j]>hh)hh=h[j];if(l[j]<ll)ll=l[j]}
-    for(let j=i-479;j<=i;j++)sm+=c[j];sm/=480;
-    if(c[i]>hh&&c[i]>sm)return {d:1,tp:20*atr,sl:8*atr,H:240};if(c[i]<ll&&c[i]<sm)return {d:-1,tp:20*atr,sl:8*atr,H:240}}
-  else if(k==="snap"){let sm=0,sq=0;for(let j=i-239;j<=i;j++){sm+=c[j];sq+=c[j]*c[j]}const m=sm/240,sd=Math.sqrt(Math.max(sq/240-m*m,0));
-    if(sd>0){const z=(c[i]-m)/sd;if(Math.abs(z)>2.5)return {d:-Math.sign(z),tp:1e9,sl:15*atr,H:60,mean:240}}}
-  return null;
-}
-function labBar(T,B,j){ // move an open test trade forward by bar j; returns the exit price or null
-  if(T.e==null){T.e=B.o[j];T.et=B.t[j];T.up=T.e+(T.d>0?T.tp:T.sl);T.dn=T.e-(T.d>0?T.sl:T.tp);T.k=0}
-  T.k++;const up=B.h[j]>=T.up,dn=B.l[j]<=T.dn;
-  if(T.d>0&&dn)return T.dn;if(T.d<0&&up)return T.up;     // stop first when both are touched in one bar
-  if(T.d>0&&up)return T.up;if(T.d<0&&dn)return Math.max(T.dn,0);
-  if(T.mean){let sm=0;for(let x=j-T.mean+1;x<=j;x++)sm+=B.c[x];if((B.c[j]-sm/T.mean)*T.d>=0)return B.c[j]}
-  return T.k>=T.H?B.c[j]:null;
-}
-function labStats(res,s,since){let n=0,w=0,g=0,b=0,sum=0;for(const x of res){if(x[0]!==s||x[2]<since)continue;n++;sum+=x[3];if(x[3]>0){w++;g+=x[3]}else b-=x[3]}
-  return {n,win:n?w/n:0,avg:n?sum/n:0,pf:b?g/b:(g?99:0),sum}}
-// offline check of the same four strategies on 22 months of real BTC 1-minute bars (Bitstamp, Jan 2025 – Oct 2026), 0.11% round-trip cost
-const LAB_HIST={scalp5:[13581,.173,-11.14],fade:[497,.352,-7.40],breakout:[4764,.33,-9.88],snap:[4818,.43,-10.11]};
-const MC={}; // 1-minute candles per coin, kept in memory only
-function openMicro(){S.micro={startTs:nowTs(),cash:0,carry:{},fund:0,fees:0,book:[],share:M.SHARE,day:today(),dayEq:0,streak:0,pauseUntil:0,allocDay:null};
-  S.lab=S.lab||{last:{},open:[],res:[],on:{}}}
-function microEq(){const m=S.micro;if(!m)return 0;let e=m.cash;for(const c in m.carry)e+=m.carry[c].lock;
-  for(const T of S.lab.open)if(T.live){const px=S.live[T.c]||T.e;e+=T.live.margin+T.live.n*T.d*(px/T.e-1)}return e}
-const totalEq=()=>equity()+microEq();
-const microActive=()=>S.acc.botOn&&!S.acc.paused&&!S.acc.cashedOut;
-function mtrade(tr){tr={ts:nowTs(),d:today(),q:tr.v/tr.px,book:"short",...tr};tr.v=+tr.v.toFixed(2);if(tr.pl!=null)tr.pl=+tr.pl.toFixed(2);
-  S.trades.push(tr);if(S.trades.length>1000)S.trades=S.trades.slice(-1000);notifyTrade(tr,"Short-term")}
-function moveBooks(x){const a=S.acc,m=S.micro;a.cash-=x;a.peak-=x;a.dayEq-=x;m.cash+=x;m.dayEq+=x} // x>0: long-term → short-term
-function microAlloc(force){
-  const m=S.micro,acc=S.acc,t=today();if(!m||(m.allocDay===t&&!force))return;m.allocDay=t;
-  const wk=Date.now()-7*DAY,pnl=m.book.filter(x=>x[0]>=wk).reduce((s,x)=>s+x[1],0),old=m.share;
-  m.share=Date.now()-Date.parse(m.startTs)>=3*DAY&&pnl>0?M.SHARE_UP:M.SHARE;
-  if(m.share!==old)logMsg(m.share>old?`Short-term book made ${usd(pnl)} in 7 days: raised to 30% of the account`:`Short-term book is not in profit over 7 days: back to 20% of the account`);
-  if(!microActive())return;
-  const gap=m.share*totalEq()-microEq();
-  if(gap>=M.MIN){const x=Math.min(gap,acc.cash-equity()*P.MIN_CASH);
-    if(x>=M.MIN){moveBooks(x);logMsg(`Moved ${usd(x,0)} from long-term cash to the short-term book (target ${pc(m.share)} of the account)`)}
-    else if(force)logMsg("Short-term book: waiting for free long-term cash above the 20% floor")}
-  else if(gap<=-M.MIN){const x=Math.min(-gap,m.cash);if(x>=M.MIN){moveBooks(-x);logMsg(`Moved ${usd(x,0)} from the short-term book back to long-term cash`)}}
-}
-/* ---- funding carry: own the coin and short the same amount of its perpetual future, collect the hourly funding ---- */
+/* ================= Market stats: daily volume, used to skip thin coins ================= */
 async function pullMarket(){
   try{const [meta,ctx]=await hl({type:"metaAndAssetCtxs"});const o={};
     meta.universe.forEach((u,i)=>{const x=ctx[i];if(!x||u.isDelisted)return;const px=+x.markPx||+x.oraclePx;if(!px)return;
       o[u.name]={f:+x.funding||0,oi:(+x.openInterest||0)*px,vlm:+x.dayNtlVlm||0,px}});
     if(Object.keys(o).length)S.mkt=o}catch(e){}
 }
-const fundHist=async(c,since)=>(await hl({type:"fundingHistory",coin:c,startTime:Math.round(since)})).map(x=>[+x.time,+x.fundingRate]);
-function fstat(h){const avg=a=>a.length?a.reduce((s,x)=>s+x[1],0)/a.length*8760:0,cut=Date.now()-24*36e5;
-  return {a72:avg(h),a24:avg(h.filter(x=>x[0]>=cut)),pos:h.length?h.filter(x=>x[1]>0).length/h.length:0,n:h.length}}
-function carryOpen(c,n,s){const m=S.micro,px=S.live[c]||S.mkt[c].px,fee=n*M.CARRY_FEE,lock=n*(1+1/M.LEV);
-  m.cash-=lock+fee;m.fees+=fee;m.book.push([Date.now(),-fee]);
-  m.carry[c]={q:n/px,n,e:px,lock,ts:nowTs(),lastF:Date.now(),earned:0,apr:s.a72,fee};
-  mtrade({a:c,side:"buy",v:n,px,why:`Funding carry: bought ${c} and shorted the same amount of the ${c} perpetual, so price moves cancel out. Perp buyers pay ${pc(s.a72,0)} a year (3-day average); the bot collects it every hour`})}
-function carryClose(c,why){const m=S.micro,p=m.carry[c],px=S.live[c]||p.e,fee=p.n*M.CARRY_FEE;
-  m.cash+=p.lock-fee;m.fees+=fee;m.book.push([Date.now(),-fee]);delete m.carry[c];
-  mtrade({a:c,side:"sell",v:p.n,px,pl:p.earned-p.fee-fee,why:`Funding carry closed: ${why}. Collected ${usd(p.earned)} in funding`})}
-async function carryStep(){
-  const m=S.micro;if(!m||!S.mkt||Date.now()-(m.carryTs||0)<55*60e3)return;m.carryTs=Date.now();
-  const now=Date.now(),st={};let got=0;
-  for(const c in m.carry){const p=m.carry[c];      // funding paid since the last check (also covers hours the page was closed)
-    try{const h=await fundHist(c,now-72*36e5);st[c]=fstat(h);const px=S.live[c]||S.mkt[c]?.px||p.e;let pay=0;
-      for(const [t,r] of h)if(t>p.lastF){pay+=r*p.q*px;p.lastF=t}
-      if(pay){m.cash+=pay;p.earned+=pay;m.fund+=pay;got+=pay;m.book.push([now,pay])}}catch(e){}
-    await sleep(150)}
-  if(got){logMsg(`Funding carry: ${got>=0?"collected":"paid"} ${usd(Math.abs(got))} in funding this round`);notifyText(`Funding ${got>=0?"collected":"paid"} ${usd(Math.abs(got))}`,`Short-term: hourly payments from perp buyers on ${Object.keys(m.carry).join(", ")}`,got<0)}
-  const cand=Object.entries(S.mkt).filter(([c,x])=>!m.carry[c]&&x.vlm>=M.MIN_VLM&&x.oi>=M.MIN_OI&&x.f*8760>=M.APR_IN).sort((a,b)=>b[1].f-a[1].f).slice(0,6);
-  for(const [c] of cand){try{st[c]=fstat(await fundHist(c,now-72*36e5))}catch(e){}await sleep(150)}
-  for(const c of Object.keys(m.carry)){const p=m.carry[c],s=st[c],px=S.live[c];if(!s)continue;p.apr=s.a72;
-    const why=s.a72<M.APR_OUT?`funding faded to ${pc(s.a72,1)} a year (3-day average)`:s.a24<-.05?`funding turned negative (${pc(s.a24,1)} a year over 24h)`:px&&px/p.e-1>=M.PUMP?`${c} rose ${pc(px/p.e-1)}, closing before the short side needs more margin`:"";
-    if(why)carryClose(c,why)}
-  m.scan={ts:nowTs(),top:cand.map(([c,x])=>[c,x.f*8760,st[c]?.a72??null])};
-  if(!microActive())return;
-  const good=cand.filter(([c])=>{const s=st[c];return s&&s.n>=48&&s.a72>=M.APR_IN&&s.a24>=M.APR_IN&&s.pos>=.8}).sort((a,b)=>st[b[0]].a72-st[a[0]].a72);
-  for(const [c] of good){const s=st[c];
-    if(Object.keys(m.carry).length>=M.CARRY_MAX){const w=Object.entries(m.carry).sort((a,b)=>a[1].apr-b[1].apr)[0];
-      if(s.a72>w[1].apr+M.APR_SWAP&&now-Date.parse(w[1].ts)>3*DAY)carryClose(w[0],`swapped for ${c}, which pays ${pc(s.a72,0)} a year`);else break}
-    const E=microEq(),locked=Object.values(m.carry).reduce((x,p)=>x+p.lock,0),k=1+1/M.LEV;
-    const n=Math.min(M.CARRY_W*E,(M.CARRY_USE*E-locked)/k,m.cash/(k+M.CARRY_FEE));
-    if(n<M.MIN)break;carryOpen(c,n,s)}
-}
-/* ---- strategy lab: every strategy trades on paper all the time; real money only after it proves itself ---- */
-function labGate(s){const st=labStats(S.lab.res,s,Date.now()-LAB.KEEP),was=!!S.lab.on[s];
-  const on=was?st.pf>=M.KEEP_PF&&st.avg>0:st.n>=M.GATE_N&&st.pf>=M.GATE_PF&&st.avg>=M.GATE_AVG;
-  if(on!==was){S.lab.on[s]=on;const nm=STRATS.find(x=>x.id===s).name;
-    logMsg(on?`Strategy lab: ${nm} passed (${st.n} test trades, ${(st.avg*1e4).toFixed(1)} bp per trade after fees, profit factor ${st.pf.toFixed(2)}). It now trades with money`:`Strategy lab: ${nm} stopped working (profit factor ${st.pf.toFixed(2)}), back to paper only`)}
-  return on?Math.min(1,st.avg/1e-3):0}
-function microOpen(T){const m=S.micro;if(!m||!microActive()||Date.now()<m.pauseUntil)return false;const w=labGate(T.s);if(!w)return false;
-  const E=microEq();if(S.lab.open.filter(x=>x.live).length>=M.DIR_MAX||E/m.dayEq-1<=M.DAY_STOP)return false;
-  const n=Math.min(M.DIR_RISK*E*w/(T.sl/T.e),M.DIR_CAP*E),margin=n/M.LEV,fee=n*LAB.COST/2;
-  if(n<M.MIN||m.cash<margin+fee)return false;m.cash-=margin+fee;T.live={n,margin,fee};const st=STRATS.find(x=>x.id===T.s);
-  mtrade({a:T.c,side:T.d>0?"buy":"short",v:n,px:T.e,why:`${st.name}: ${st.how}`});return true}
-function microClose(T,xp,r){const m=S.micro,L=T.live,g=L.n*T.d*(xp/T.e-1),fee=L.n*LAB.COST/2,pl=L.n*r,st=STRATS.find(x=>x.id===T.s);
-  m.cash+=L.margin+g-fee;m.fees+=L.fee+fee;m.book.push([Date.now(),pl]);
-  m.streak=pl<0?m.streak+1:0;if(m.streak>=M.STREAK){m.pauseUntil=Date.now()+M.PAUSE;m.streak=0;logMsg("Short-term trading paused for 6 hours after 4 losing trades in a row")}
-  mtrade({a:T.c,side:T.d>0?"sell":"cover",v:L.n,px:xp,pl,why:`${st.name}: closed after ${T.k} min`})}
-function labRun(coin,B){
-  const L=S.lab,last=L.last[coin]||0,fresh=Date.now()-3.5*60e3;let j0=B.t.findIndex(t=>t>last);if(j0<0)return;
-  for(let j=Math.max(j0,1);j<B.t.length;j++){
-    for(const T of L.open.filter(x=>x.c===coin)){const first=T.e==null,xp=labBar(T,B,j);
-      if(first&&T.fresh&&!microOpen(T))notifyText(`Test: ${T.d>0?"buy":"short"} ${coin}`,`Strategy lab, paper only: ${STRATS.find(x=>x.id===T.s).name}`,T.d<0,true);
-      if(xp==null)continue;const r=T.d*(xp/T.e-1)-LAB.COST;L.res.push([T.s,coin,T.et,+r.toFixed(6),T.live?1:0]);
-      if(T.live)microClose(T,xp,r);L.open.splice(L.open.indexOf(T),1)}
-    for(const st of STRATS){if(L.open.some(x=>x.c===coin&&x.s===st.id))continue;const g=labSignal(st.id,B,j);
-      if(g)L.open.push({s:st.id,c:coin,...g,sig:B.t[j],fresh:B.t[j]>=fresh})}
-  }
-  L.last[coin]=B.t.at(-1);const cut=Date.now()-LAB.KEEP;L.res=L.res.filter(x=>x[2]>=cut).slice(-6000);
-}
-async function pullMinute(){
-  if(!S.lab)return;const now=Date.now();
-  for(const c of M.COINS){if(!S.live[c])continue;const last=S.lab.last[c];
-    let B=MC[c];const since=B&&B.t.length?B.t.at(-1)-60e3:last?Math.max(now-5000*60e3,last-1000*60e3):now-5000*60e3;
-    try{const d=await hl({type:"candleSnapshot",req:{coin:c,interval:"1m",startTime:Math.round(since),endTime:now}});
-      B=MC[c]=B||{t:[],o:[],h:[],l:[],c:[],v:[]};
-      for(const x of d.sort((a,b)=>a.t-b.t)){const t=+x.t;if(t+60e3>now||(B.t.length&&t<=B.t.at(-1)))continue;
-        B.t.push(t);B.o.push(+x.o);B.h.push(+x.h);B.l.push(+x.l);B.c.push(+x.c);B.v.push(+x.v)}
-      labRun(c,B);const cut=B.t.length-1200;if(cut>0)for(const k of "tohlcv")B[k].splice(0,cut);
-    }catch(e){}
-    await sleep(120)}
-}
-function microDay(){const m=S.micro,t=today();if(m&&m.day!==t){m.day=t;m.dayEq=microEq()}}
-function microCloseAll(why){const m=S.micro;if(!m)return;for(const c of Object.keys(m.carry))carryClose(c,why);
-  for(const T of S.lab.open.filter(x=>x.live)){const xp=S.live[T.c]||T.e,r=T.d*(xp/T.e-1)-LAB.COST;microClose(T,xp,r);T.live=null}}
 
 /* ================= Main loop ================= */
 let busy=false,lastSlow=0,nextAt=0;
-function record(){const E=totalEq(),ts=nowTs(),last=S.curve.at(-1);
+function record(){const E=equity(),ts=nowTs(),last=S.curve.at(-1);
   if(!last||Date.parse(ts)-Date.parse(last[0])>=10*60e3)S.curve.push([ts,+E.toFixed(2)]);else last[1]=+E.toFixed(2);
   const cut=Date.now()-2*DAY,out=[];let lastH="";
   for(const c of S.curve){if(Date.parse(c[0])>=cut){out.push(c);continue}const h=c[0].slice(0,13);if(h!==lastH){out.push(c);lastH=h}else out[out.length-1]=c}
@@ -726,31 +587,30 @@ function record(){const E=totalEq(),ts=nowTs(),last=S.curve.at(-1);
 async function tick(){
   if(busy)return;busy=true;
   try{
-    const round=()=>{stampPrices();step();microDay();microAlloc();record();save();render()};
+    const round=()=>{stampPrices();step();record();save();render()};
     await pullMids();if(!S.mkt)await pullMarket();round();
-    await pullMinute();round();
     if(Date.now()-lastSlow>5*60e3){lastSlow=Date.now();
-      await pullMarket();await carryStep();round();
+      await pullMarket();
       await pullFilings();try{await runScout()}catch(e){}round();
       await pullStocks();await pullCandles();round();
       await pullWallets();round();}
-    await pullTraders();round();
+    await pullTraders();if(!ready&&lastSlow){ready=true;feedPush("info","Players loaded",`Copying ${target().np} players now.`,"player")}round();
   }catch(e){console.error(e)}
   finally{busy=false;nextAt=Date.now()+60e3;render()}
 }
 
 /* ================= Controls ================= */
-function toast(m){const t=document.getElementById("toast");t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,3500)}
+function toast(m){feedPush("info",m,"","player");render()}   // every message lands in the live activity list and stays there
 document.getElementById("bStop").onclick=()=>{const a=S.acc;
   if(a.botOn&&!a.paused&&!a.cashedOut){a.botOn=false;logMsg("Bot stopped by the owner. Positions are kept, no new trades.");toast("Bot stopped")}
   else{a.botOn=true;a.paused=false;a.cashedOut=false;a.peak=Math.max(equity(),1);logMsg("Bot started by the owner.");toast("Bot started")}
   save();render()};
 document.getElementById("bCash").onclick=()=>{if(!confirm("Sell every position at current prices and stop the bot?"))return;
-  for(const a of Object.keys(S.acc.pos))trade(a,"sell",S.acc.pos[a].q*(pxNow(a)||S.acc.pos[a].last),"Cash out all (owner)");microCloseAll("cash out all (owner)");
+  for(const a of Object.keys(S.acc.pos))trade(a,"sell",S.acc.pos[a].q*(pxNow(a)||S.acc.pos[a].last),"Cash out all (owner)");
   S.acc.botOn=false;S.acc.cashedOut=true;logMsg("Cashed out: every position sold, bot stopped.");save();render();toast("Cashed out. Everything is in cash.")};
 document.getElementById("bReset").onclick=()=>{if(!confirm("Start a fresh $10,000 demo account? Trade history will be cleared. Players and scout stay."))return;
-  S.acc=null;S.trades=[];S.curve=[];S.log=[];for(const e of S.events)S.seen[e.key]=1;openAccount();
-  for(const T of S.lab?.open||[])T.live=null;openMicro();logMsg("Demo account reset to $10,000.");microAlloc(true);save();render()};
+  S.acc=null;S.trades=[];S.curve=[];S.log=[];S.block={};openAccount();logMsg("Demo account reset to $10,000.");
+  feedPush("info","Demo account reset to $10,000","The bot rebuilds the copied portfolio right away from what the players hold now.","player");step();record();save();render()};
 const dlg=document.getElementById("dlgAdd");
 document.getElementById("bAdd").onclick=()=>{document.getElementById("wErr").textContent="";dlg.showModal()};
 document.getElementById("fAdd").addEventListener("submit",ev=>{
@@ -793,52 +653,49 @@ function chart(){
   $("chartSub").textContent="since "+when(S.acc.startTs||S.acc.start);
 }
 function render(){
-  const a=S.acc,E=equity(),T=totalEq(),ret=T/a.capital-1;
+  const a=S.acc,E=equity(),ret=E/a.capital-1;
   const status=a.cashedOut?"Cashed out":a.paused?"Emergency stop":a.botOn?"Bot running":"Bot stopped";
   $("statusTxt").textContent=status;$("statusPill").className="pill "+(status==="Bot running"?"on":"off");
   $("bStop").textContent=status==="Bot running"?"Stop bot":"Start bot";
   const secs=Math.max(0,Math.round((nextAt-Date.now())/1000));
   $("liveTxt").textContent=busy?"Checking markets and players now…":`Last check ${new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})}. Prices and traders every minute, wallets and filings every 5 minutes.`;
-  $("kEq").textContent=usd(T);$("kEqS").textContent=`long-term ${usd(E,0)} · short-term ${usd(T-E,0)}`;
+  $("kEq").textContent=usd(E);$("kEqS").textContent=`invested ${usd(E-a.cash,0)} in ${Object.keys(a.pos).length} assets`;
   $("kRet").textContent=pct(ret,2);$("kRet").className="v "+cls(ret);const bm=Object.entries(a.bench||{}).filter(([b,p])=>S.live[b]).map(([b,p])=>`${b==="SPY"?"S&P 500":b} ${pct(S.live[b]/p-1)}`);
   $("kRetS").textContent=bm.length?`same time, market: ${bm.join(" · ")}`:`started ${usd(a.capital,0)} on ${a.start}`;
-  $("kCash").textContent=usd(a.cash,0);$("kCashS").textContent=`earns 3.5% a year: +${usd(a.interest||0)} so far · fees ${usd(a.fees+(S.micro?.fees||0))}`;
+  $("kCash").textContent=usd(a.cash,0);$("kCashS").textContent=`earns 3.5% a year: +${usd(a.interest||0)} so far · fees ${usd(a.fees)}`;
   const sells=S.trades.filter(t=>t.pl!=null),wins=sells.filter(t=>t.pl>0).length,real=sells.reduce((s,t)=>s+t.pl,0);
   $("kWL").textContent=`${wins} / ${sells.length-wins}`;$("kWLS").innerHTML=`won / lost · realized <span class="${cls(real)}">${usd(real)}</span>`;
   const skip=skipSet(),tr=S.players.filter(p=>!skip.has(p.id));
   $("kPl").textContent=tr.length;$("kPlS").textContent=`${S.players.reduce((s,p)=>s+(p.wallets||[]).length,0)} wallets · ${S.scout.filter(s=>s.status==="probation").length} on probation`;
-  chart();renderMicro();
+  chart();renderFeed();renderTarget();
   const pos=Object.entries(a.pos).map(([k,p])=>({a:k,...p,value:p.q*p.last})).sort((x,y)=>y.value-x.value);
   $("pos").innerHTML=pos.length?`<table><thead><tr><th>Asset</th><th class="r">Value</th><th class="r hide-sm">Avg cost</th><th class="r">Price</th><th class="r">P/L</th><th class="r hide-sm">Stop</th></tr></thead><tbody>${
     pos.map(p=>{const pl=p.last/p.avg-1,stop=Math.max(p.avg*(1+P.STOP),p.hi*(1-trail(p.a)));
       return `<tr><td><b class="${isCrypto(p.a)?"k-crypto":"k-stock"}">${esc(p.a)}</b> <span class="sub">${(p.value/E*100).toFixed(0)}%</span></td><td class="r num">${usd(p.value)}</td><td class="r num hide-sm">${usd(p.avg)}</td><td class="r num">${usd(p.last)}</td><td class="r num ${cls(pl)}">${pct(pl)}</td><td class="r num hide-sm">${usd(stop)}</td></tr>`}).join("")}</tbody></table>`
-    :'<div class="empty">No positions yet, all cash. The bot copies each tracked player, sized by the bet and their track record.</div>';
+    :'<div class="empty">No positions yet. The bot buys as soon as it has loaded what the players hold.</div>';
   const trs=S.trades.slice(-300).reverse();$("trSub").textContent=`${S.trades.length} total`;
-  $("trades").innerHTML=trs.length?trs.map(t=>`<div class="row"><span class="tag t-${t.side}">${t.side}</span><div><b>${esc(t.a)}</b> <span class="sub">${t.book==="short"?"short-term":"long-term"}</span> <span class="num">${usd(t.v)}</span> at <span class="num">${usd(t.px)}</span>${t.pl!=null?` · <span class="num ${cls(t.pl)}">${usd(t.pl)}</span>`:""}<div class="why">${esc(t.why)}</div></div><span class="sub">${esc(when(t.ts))}</span></div>`).join(""):'<div class="empty">No trades yet.</div>';
+  $("trades").innerHTML=trs.length?trs.map(t=>`<div class="row"><span class="tag t-${t.side}">${t.side}</span><div><b>${esc(t.a)}</b> <span class="num">${usd(t.v)}</span> at <span class="num">${usd(t.px)}</span>${t.pl!=null?` · <span class="num ${cls(t.pl)}">${usd(t.pl)}</span>`:""}<div class="why">${esc(t.why)}</div></div><span class="sub">${esc(when(t.ts))}</span></div>`).join(""):'<div class="empty">No trades yet.</div>';
   const lg=S.log.slice(-150).reverse();
   $("log").innerHTML=lg.length?lg.map(l=>`<div class="row"><span class="sub">${esc(when(l[0]))}</span><div class="why">${esc(l[1])}</div><span></span></div>`).join(""):'<div class="empty">Nothing yet.</div>';
   renderSignals();renderPlayers();
   $("scout").innerHTML=S.scout.length?S.scout.slice().reverse().map(s=>`<div class="row"><span class="tag ${s.status==="promoted"?"t-buy":s.status==="rejected"?"t-sell":"t-move"}">${esc(s.status)}</span><div><b>${esc(s.name)}</b><div class="why">${esc(s.why)}</div><div class="why">${esc(s.check)}</div>${s.src?`<a class="sub" href="${esc(s.src[1])}" target="_blank" rel="noopener">${esc(s.src[0])}</a>`:""}</div><span class="sub">${esc((s.found||"").slice(0,10))}</span></div>`).join(""):'<div class="empty">The scout runs once a day while this page is open.</div>';
-  const rl=[["Every proven player","copied, size by track record"],["Veto","skip if 60% go the other way"],["Others agree","up to 2× size"],["Signal window",P.WIN+" days"],["Older signals weigh less","half after "+P.HALF_LIFE+" days"],["Hard stop-loss",pct(P.STOP,0)],["Trailing stop","10–25% by volatility"],["Take profit","sell ⅓ at +30%"],["Max per stock","15%"],["Max per coin","10%"],["Max all crypto","60%"],["Cash floor","20%"],["Daily loss brake","no buys after −4%"],["Emergency stop","−20% from peak"],["Skip if price ran","over +20%"],["Fee per trade","0.08% coins, 0.02% stocks"],["Idle cash earns","3.5% a year"],["Coins copied","daily volume ≥$10M"],["Player trims","copied only if ≥30%, same share"],["Short-term book","20%, 30% after a profitable week"],["Carry entry","funding ≥10% a year for 3 days"],["Carry exit","under 3% a year, or negative"],["Strategy gets money","40 tests, PF ≥1.5, +3 bp after fees"],["Short-term risk per trade","0.5% of the book"],["Short-term brakes","−2% day, 4 losses → 6h pause"]];
+  const rl=[["What it copies","what tracked players hold now"],["Player vote","track record × book size (log)"],["Shorts by players","lower the target"],["Max per asset","15%"],["Max all crypto","60%"],["Cash kept","10%, earns 3.5% a year"],["Trades when","off target by >25% and >$100"],["Coins copied","daily volume ≥$10M"],["Hard stop-loss","−15%, then 3 days out"],["Trailing stop","10–25% by volatility"],["Daily loss brake","no buys after −4%"],["Emergency stop","−20% from peak"],["Fee per trade","0.08% coins, 0.02% stocks"],["Scout","new top traders daily, 2-day check"]];
   $("rules").innerHTML=rl.map(r=>`<div><span class="sub">${r[0]}</span><b class="num">${esc(r[1])}</b></div>`).join("");
 }
-function renderMicro(){
-  const m=S.micro;if(!m){$("micro").innerHTML="";return}
-  const E=microEq(),T=totalEq(),open=S.lab.open.filter(x=>x.live),dir=m.book.length?S.trades.filter(t=>t.book==="short"&&t.pl!=null&&!t.why.startsWith("Funding")).reduce((s,t)=>s+t.pl,0):0;
-  $("mSub").textContent=`trades on its own · ${pc(m.share)} of the account`;
-  const carry=Object.entries(m.carry);
-  let h=`<div class="mk"><div><div class="l">Value</div><div class="v">${usd(E,0)}</div><div class="l">${(E/T*100).toFixed(0)}% of the account</div></div>
-   <div><div class="l">Funding collected</div><div class="v ${cls(m.fund)}">${usd(m.fund)}</div><div class="l">${carry.length?`+${usd(carry.reduce((s,[c,p])=>s+p.q*(S.live[c]||p.e)*(S.mkt?.[c]?.f||0)*(Date.now()-p.lastF)/36e5,0))} accruing for the next hourly payment`:"no carry positions yet"}</div></div>
-   <div><div class="l">Strategy trades P/L</div><div class="v ${cls(dir)}">${usd(dir)}</div><div class="l">${open.length} open now</div></div>
-   <div><div class="l">Cash in book</div><div class="v">${usd(m.cash,0)}</div><div class="l">fees ${usd(m.fees)}</div></div></div>`;
-  h+=`<div class="mh">Funding carry</div>`+(carry.length?`<table><thead><tr><th>Coin</th><th class="r">Size</th><th class="r">Pays per year</th><th class="r">Collected</th><th class="r hide-sm">Since</th></tr></thead><tbody>${carry.map(([c,p])=>`<tr><td><b class="k-crypto">${esc(c)}</b></td><td class="r num">${usd(p.n,0)}</td><td class="r num">${pc(p.apr,1)}</td><td class="r num ${cls(p.earned)}">${usd(p.earned)}</td><td class="r sub hide-sm">${esc(when(p.ts))}</td></tr>`).join("")}</tbody></table>`
-    :`<div class="empty">${m.scan?`No coin pays enough right now. Best now: ${m.scan.top.slice(0,3).map(x=>`${esc(x[0])} ${pc(x[1],0)}`).join(", ")||"none above 10%"} a year.`:"First market scan runs in a minute."}</div>`);
-  if(open.length)h+=`<div class="mh">Open strategy trades</div><table><tbody>${open.map(x=>{const px=S.live[x.c]||x.e,pl=x.live.n*x.d*(px/x.e-1);return `<tr><td><span class="tag t-${x.d>0?"buy":"short"}">${x.d>0?"long":"short"}</span> <b>${esc(x.c)}</b></td><td class="r num">${usd(x.live.n,0)}</td><td class="r num ${cls(pl)}">${usd(pl)}</td><td class="r sub">${esc(STRATS.find(s=>s.id===x.s).name)}</td></tr>`}).join("")}</tbody></table>`;
-  const since=Date.now()-LAB.KEEP;
-  h+=`<div class="mh">Strategy lab: every strategy trades on paper first</div><table><thead><tr><th>Strategy</th><th class="r">Tests, 7 days</th><th class="r hide-sm">Win</th><th class="r">Per trade after fees</th><th class="r hide-sm">22-month check</th><th class="r">Status</th></tr></thead><tbody>${STRATS.map(s=>{const st=labStats(S.lab.res,s.id,since),hh=LAB_HIST[s.id],on=S.lab.on[s.id];
-    return `<tr><td><b>${esc(s.name)}</b><div class="why">${esc(s.how)}</div></td><td class="r num">${st.n}</td><td class="r num hide-sm">${st.n?(st.win*100).toFixed(0)+"%":"–"}</td><td class="r num ${cls(st.avg)}">${st.n?(st.avg*1e4).toFixed(1)+" bp":"–"}</td><td class="r num hide-sm down">${hh[2].toFixed(1)} bp</td><td class="r"><span class="tag ${on?"t-buy":"t-move"}">${on?"trading":"paper"}</span></td></tr>`}).join("")}</tbody></table>
-  <div class="note">Coins watched: ${M.COINS.join(", ")}, minute by minute. bp = 0.01%. Each round trip costs about 11 bp in fees and slippage. In an offline test on 22 months of real BTC minutes, all ${STRATS.length} strategies and about 1,900 variants of 5–15 minute trading lost money after those costs, so a strategy only gets money after it beats them live: ${M.GATE_N}+ paper trades in 7 days, profit factor ≥${M.GATE_PF}, at least +3 bp per trade. Funding carry is the part that earns: on Hyperliquid, perp buyers usually pay sellers every hour.${Date.now()<m.pauseUntil?` Paused until ${esc(when(new Date(m.pauseUntil).toISOString()))} after 4 losses in a row.`:""}</div>`;
-  $("micro").innerHTML=h;
+let feedSeen=0;
+function renderFeed(){
+  const f=(S.feed||[]).slice(-60).reverse();
+  if(!feedSeen)feedSeen=f.length?f[0].id-1:0;  // on page load, highlight nothing older than now
+  $("feed").innerHTML=f.length?f.map(x=>`<div class="frow ${esc(x.cls)}${x.id>feedSeen?" fresh":""}"><span class="sub num">${esc(new Date(x.ts).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}))}</span><div><b>${esc(x.title)}</b><div class="why">${esc(x.why)}</div></div><span class="ftag">${x.kind==="trade"?"Bot":x.kind==="signal"?"Player":"Info"}</span></div>`).join(""):'<div class="empty">Starting…</div>';
+  $("feedSub").textContent=`${S.trades.filter(t=>Date.parse(t.ts)>Date.now()-DAY).length} bot trades in 24h`;
+  clearTimeout(renderFeed.t);renderFeed.t=setTimeout(()=>{feedSeen=f.length?f[0].id:0},60e3);
+}
+function renderTarget(){
+  const T=S.target,E=equity();if(!T||!T.rows.length){$("target").innerHTML=`<div class="empty">Loading what the players hold: Hyperliquid positions now, wallets, and officials’ net buying over 12 months.</div>`;$("tgSub").textContent="";return}
+  $("tgSub").textContent=`built from ${T.np} players · updates every minute`;
+  $("target").innerHTML=`<table><thead><tr><th>Asset</th><th class="r">Target</th><th class="r">Now</th><th>Held by</th></tr></thead><tbody>${T.rows.map(([a,f,w,n])=>{const p=S.acc.pos[a],now=p?p.q*(pxNow(a)||p.last)/E:0;
+    return `<tr><td><b class="${isCrypto(a)?"k-crypto":"k-stock"}">${esc(a)}</b></td><td class="r num">${pc(f,1)}</td><td class="r num ${Math.abs(now-f)>f*P.BAND?"sub":""}">${pc(now,1)}</td><td class="why">${esc(w.join(", "))}${n>3?` +${n-3}`:""}</td></tr>`}).join("")}</tbody></table>
+  <div class="note">Each player votes with what they hold now; a bigger book and a better track record count more. ${pc(P.MIN_CASH,0)} stays in cash. The bot trades only when an asset is more than ${pc(P.BAND,0)} off its target, so small wiggles cost no fees.</div>`;
 }
 function renderSignals(){
   const nm=names();
@@ -859,8 +716,7 @@ $("pq").addEventListener("input",renderPlayers);
 /* ================= Start ================= */
 S=load()||freshState();
 if((S.ver||1)<2){for(const e of S.events)if(e.hold&&e.d>=iso(dn(today())-1))delete S.seen[e.key];S.ver=2}
-if(!S.acc){openAccount();for(const e of S.events)if(dn(e.d)<dn(today())-3)S.seen[e.key]=1;logMsg("Demo account opened with $10,000.")}
-if(!S.micro){openMicro();microAlloc(true)}
+if(!S.acc){openAccount();logMsg("Demo account opened with $10,000.");S.books=S.books||{};feedPush("info","Demo account opened with $10,000","Loading what the players hold now. The first purchases follow within a minute.","player")}
 if(S.lastRun&&Date.now()-S.lastRun>3600e3)logMsg(`Back after ${Math.round((Date.now()-S.lastRun)/3600e3)}h closed. Catching up on signals from the last 3 days.`);
 setInterval(()=>{S.lastRun=Date.now()},30e3);
 render();tick();setInterval(tick,60e3);
