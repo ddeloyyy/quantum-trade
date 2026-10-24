@@ -185,7 +185,7 @@ const P={CAPITAL:10000,WIN:30,THR:.6,HALF_LIFE:10,
   TIERS:[[10e6,"large",.16,1],[1e6,"medium",.08,.5],[50e3,"regular",.03,.25],[0,"small",.015,.25]],BIG:50e3,
   STOP:-.15,TRAIL_K:2.5,TRAIL_MIN:.10,TRAIL_MAX:.25,TP_LEVEL:.30,TP_FRAC:1/3,
   MAX_ASSET:.15,MAX_ASSET_CRYPTO:.10,MAX_CRYPTO:.60,MIN_CASH:.20,DAY_LOSS:-.04,KILL:-.20,
-  MIN_TRADE:100,HOLD_W:.04,COOLDOWN:3600e3,FEE:.001,TARGET_VOL:.45,CHASE_SKIP:.20,CHASE_HALF:.10,HIT_H:20,STALE:120};
+  MIN_TRADE:100,HOLD_W:.04,COOLDOWN:3600e3,FEE_CRYPTO:.0008,FEE_STOCK:.0002,CASH_APY:.035,MIN_LIQ:10e6,TRIM_MIN:.3,TARGET_VOL:.45,CHASE_SKIP:.20,CHASE_HALF:.10,HIT_H:20,STALE:120};
 const WATCH_GROUPS=new Set(["Market makers"]);
 const KEY="quantum-trade-live-v1";
 const DAY=864e5;
@@ -280,10 +280,10 @@ function checks(e){
 }
 function trade(a,side,v,why,sig){
   const acc=S.acc,p_=pxNow(a),t=today();if(!p_||v<=0)return;
-  let fee=v*P.FEE,q,pl=null;
+  const fr=isCrypto(a)?P.FEE_CRYPTO:P.FEE_STOCK;let fee=v*fr,q,pl=null;
   if(side==="buy"){q=(v-fee)/p_;const p=acc.pos[a]||(acc.pos[a]={q:0,avg:0,last:p_,hi:p_,tp:false,opened:t,sig:t});
     p.avg=(p.avg*p.q+p_*q)/(p.q+q);p.q+=q;p.sig=t;p.lastBuy=nowTs();acc.cash-=v}
-  else{const p=acc.pos[a];q=Math.min(v/p_,p.q);v=q*p_;fee=v*P.FEE;p.q-=q;acc.cash+=v-fee;pl=(p_-p.avg)*q-fee;if(p.q*p_<1)delete acc.pos[a]}
+  else{const p=acc.pos[a];q=Math.min(v/p_,p.q);v=q*p_;fee=v*fr;p.q-=q;acc.cash+=v-fee;pl=(p_-p.avg)*q-fee;if(p.q*p_<1)delete acc.pos[a]}
   acc.fees+=fee;
   const tr={ts:nowTs(),d:t,a,side,v:+v.toFixed(2),q,px:p_,why};if(sig)tr.sig=sig;if(pl!==null)tr.pl=+pl.toFixed(2);
   S.trades.push(tr);if(S.trades.length>1000)S.trades=S.trades.slice(-1000);
@@ -313,8 +313,13 @@ function exits(skip){
     if(dn(t)-dn(p.sig||p.opened)>P.STALE)trade(a,"sell",p.q*n,"No fresh buying by tracked players for 120 days");
   }
 }
+function accrueCash(){const now=Date.now(),a=S.acc;if(!a)return;const last=a.yTs||now;a.yTs=now;
+  const k=P.CASH_APY*Math.min(now-last,7*DAY)/(365*DAY);if(k<=0)return;
+  const x=a.cash*k;a.cash+=x;a.interest=(a.interest||0)+x;
+  if(S.micro){const y=S.micro.cash*k;S.micro.cash+=y;a.interest+=y;S.micro.book.push([now,y]);if(S.micro.book.length>5000)S.micro.book=S.micro.book.slice(-5000)}
+  a.bench=a.bench||{};for(const b of ["BTC","SPY"])if(!a.bench[b]&&S.live[b])a.bench[b]=S.live[b]}
 function step(){
-  if(!S.acc)openAccount();
+  if(!S.acc)openAccount();accrueCash();
   const acc=S.acc,t=today(),skip=skipSet(),names=Object.fromEntries(S.players.map(p=>[p.id,p.name]));
   for(const k in acc.pos){const p=acc.pos[k],n=pxNow(k);if(n){p.last=n;p.hi=Math.max(p.hi||n,n)}}
   if(acc.day!==t){acc.day=t;acc.dayEq=equity()}
@@ -347,6 +352,7 @@ function step(){
     if(opp){logMsg(`${who} ${e.t} ${a}: skipped, ${pc(e.t==="buy"?c.sell:c.buy)} of players go the other way`);continue}
     const agree=c&&c.n>=2?(e.t==="buy"?c.vb:c.vs):0,boost=c&&c.n>=2?.75+.75*agree:.75;
     const note=c&&c.n>=2?`${pc(e.t==="buy"?c.buy:c.sell)} of ${c.n} players agree`:"only player on this asset";
+    if(e.t==="buy"&&isCrypto(a)&&S.mkt&&!(S.mkt[a]?.vlm>=P.MIN_LIQ)){logMsg(`${who} buy ${a}: skipped, thin market (under $10M traded a day), prices jump too much`);continue}
     if(e.t==="buy"&&!braked){
       const E=equity(),held=(acc.pos[a]?.q||0)*pxNow(a);
       if(held&&e.usd<1e6&&acc.pos[a].lastBuy&&Date.now()-Date.parse(acc.pos[a].lastBuy)<P.COOLDOWN){logMsg(`${who} buy ${a}: already added to ${a} in the last hour, waiting`);continue}
@@ -357,7 +363,9 @@ function step(){
       if(v<P.MIN_TRADE){logMsg(`${who} buy ${a}: ${["size too small","asset limit reached","cash floor reached","crypto limit reached"][room.indexOf(v)]}`);continue}
       trade(a,"buy",v,`${who}: ${kname} buy, ${note}`+(why?"; "+why:""),e.key);
     }else if(e.t==="buy")logMsg(`${who} buy ${a}: paused, daily loss brake is on`);
-    else if(acc.pos[a]){const all=acc.pos[a].q*pxNow(a);let v=all*Math.min(1,sellF*mult*boost/.75);
+    else if(acc.pos[a]){const all=acc.pos[a].q*pxNow(a);
+      if(e.frac!=null&&e.frac<P.TRIM_MIN){logMsg(`${who} sell ${a}: trimmed only ${pc(e.frac)} of the position, keeping ours (small trims only cost fees)`);continue}
+      let v=all*Math.min(1,e.frac!=null?e.frac:sellF*mult*boost/.75);
       if(v<P.MIN_TRADE)v=all<2*P.MIN_TRADE?all:0;   // tiny sells only waste fees: sell all of a small position or wait
       if(v>0)trade(a,"sell",v,`${who}: ${kname} sell, ${note}`,e.key);else logMsg(`${who} sell ${a}: too small to act on`)}
   }
@@ -456,7 +464,7 @@ async function pullMids(){
   catch(e){setH("hl","bad")}
 }
 async function pullFilings(){
-  if(S.ocDay===today())return;setH("oc","busy");
+  if(S.ocDay===today()&&S.holdings){setH("oc","ok");return}setH("oc","busy");
   try{const [ev,people,holdings]=await ogeEvents(iso(dn(today())-120));const ids=new Set(S.players.map(p=>p.id));let n=0;
     S.holdings=holdings;const evLo=iso(dn(today())-40);
     for(const e of ev){if(e.d<evLo)continue;if(addEvent(e)&&e.t!=="move")n++;
@@ -475,7 +483,7 @@ async function pullTraders(){
       for(const c of new Set([...Object.keys(prev),...Object.keys(pos)])){const px=S.live[c];if(!px)continue;
         if(first){const sz=pos[c]||0;if(Math.abs(sz)*px>=25e3)addEvent({key:`hl-${p.id}-${c}-${ts}`,d:t,td:t,w:p.id,a:c,t:sz>0?"buy":"sell",usd:Math.round(Math.abs(sz)*px),k:"crypto",hold:true,txt:`Holds a ${sz>0?"long":"short"} of ${Math.abs(sz).toLocaleString("en-US",{maximumFractionDigits:2})} ${c}`,src});continue}
         const d=(pos[c]||0)-(prev[c]||0);if(Math.abs(d)*px<thr)continue;
-        addEvent({key:`hl-${p.id}-${c}-${ts}`,d:t,td:t,w:p.id,a:c,t:d>0?"buy":"sell",usd:Math.round(Math.abs(d)*px),k:"crypto",
+        addEvent({key:`hl-${p.id}-${c}-${ts}`,d:t,td:t,w:p.id,a:c,t:d>0?"buy":"sell",usd:Math.round(Math.abs(d)*px),k:"crypto",frac:d<0&&(prev[c]||0)>0?Math.min(1,-d/prev[c]):undefined,
           txt:`${d>0?"Bought":"Sold"} ${Math.abs(d).toLocaleString("en-US",{maximumFractionDigits:2})} ${c} (~$${Math.round(Math.abs(d)*px).toLocaleString("en-US")}), now ${(pos[c]||0).toLocaleString("en-US",{maximumFractionDigits:2})}`,src})}
       S.snaps[k]=pos}catch(e){}
     await sleep(150)}
@@ -484,21 +492,21 @@ async function pullTraders(){
 async function pullWallets(){
   const skip=skipSet(),ws=S.players.filter(p=>!skip.has(p.id)&&(p.wallets||[]).some(w=>(w[2]||"ethereum")!=="hyperliquid"));
   setH("wl","busy");let ok=0,fail=0;const t=today(),ts=nowTs();
-  for(const p of ws){const snap=S.snaps[p.id]||{},cur={},gross={},net={};
+  for(const p of ws){const snap=S.snaps[p.id]||{},cur={},gross={},net={},pt={};
     for(const w of p.wallets){const chain=w[2]||"ethereum";if(chain==="hyperliquid")continue;
       try{const h=await walletHoldings(w[0],chain);ok++;cur[w[0]]={};
         for(const a in h){cur[w[0]][a]=h[a][0];if(!S.live[a]||!S.mids?.includes(a))S.live[a]=S.live[a]||h[a][1]}
-        const prev=snap[w[0]];if(prev)for(const a of new Set([...Object.keys(prev),...Object.keys(cur[w[0]])])){const d=(cur[w[0]][a]||0)-(prev[a]||0);net[a]=(net[a]||0)+d;gross[a]=(gross[a]||0)+Math.abs(d)}}
+        const prev=snap[w[0]];if(prev)for(const a of new Set([...Object.keys(prev),...Object.keys(cur[w[0]])])){const d=(cur[w[0]][a]||0)-(prev[a]||0);pt[a]=(pt[a]||0)+(prev[a]||0);net[a]=(net[a]||0)+d;gross[a]=(gross[a]||0)+Math.abs(d)}}
       catch(e){fail++;if(snap[w[0]])cur[w[0]]=snap[w[0]]}
       await sleep(250)}
     for(const a in gross){const px=pxNow(a);if(!px||gross[a]*px<10e3)continue;const n=net[a],src=["Blockscout",`https://eth.blockscout.com/address/${p.wallets[0][0]}`];
       if(Math.abs(n)<.25*gross[a])addEvent({key:`wl-${p.id}-${a}-${ts}`,d:t,td:t,w:p.id,a,t:"move",usd:Math.round(gross[a]*px),k:"crypto",txt:`Moved ${a} between own wallets (net change ${n.toFixed(2)})`,src});
-      else if(Math.abs(n)*px>=10e3)addEvent({key:`wl-${p.id}-${a}-${ts}`,d:t,td:t,w:p.id,a,t:n>0?"buy":"sell",usd:Math.round(Math.abs(n)*px),k:"crypto",txt:`${n>0?"Added":"Reduced"} ${Math.abs(n).toLocaleString("en-US",{maximumFractionDigits:2})} ${a} across tracked wallets (~$${Math.round(Math.abs(n)*px).toLocaleString("en-US")})`,src})}
+      else if(Math.abs(n)*px>=10e3)addEvent({key:`wl-${p.id}-${a}-${ts}`,d:t,td:t,w:p.id,a,t:n>0?"buy":"sell",usd:Math.round(Math.abs(n)*px),k:"crypto",frac:n<0&&pt[a]>0?Math.min(1,-n/pt[a]):undefined,txt:`${n>0?"Added":"Reduced"} ${Math.abs(n).toLocaleString("en-US",{maximumFractionDigits:2})} ${a} across tracked wallets (~$${Math.round(Math.abs(n)*px).toLocaleString("en-US")})`,src})}
     S.snaps[p.id]=cur}
   setH("wl",ok?(fail>ok?"bad":"ok"):"bad");S.wallTs=Date.now();
 }
 async function pullStocks(){
-  const t=today(),recent=iso(dn(t)-3),need=new Set(Object.keys(S.acc?.pos||{}));
+  const t=today(),recent=iso(dn(t)-3),need=new Set([...Object.keys(S.acc?.pos||{}),"SPY"]);
   for(const x of S.holdings||[])if(!(S.holdDone||{})[x.a])need.add(x.a);
   for(const e of S.events)if(e.d>=recent&&e.t!=="move")need.add(e.a);
   for(const x of S.pending)if(iso(dn(x[4])+P.HIT_H)<=iso(dn(t)+1))need.add(x[2]);
@@ -563,7 +571,7 @@ async function runScout(){
 }
 
 /* ================= Short-term book: 20-30% of the account, trades on its own (no copying) ================= */
-const M={SHARE:.20,SHARE_UP:.30,LEV:3,CARRY_MAX:4,CARRY_W:.20,CARRY_USE:.70,APR_IN:.12,APR_OUT:.03,APR_SWAP:.25,
+const M={SHARE:.20,SHARE_UP:.30,LEV:3,CARRY_MAX:4,CARRY_W:.20,CARRY_USE:.70,APR_IN:.10,APR_OUT:.03,APR_SWAP:.25,
   CARRY_FEE:.00135,MIN_VLM:20e6,MIN_OI:10e6,PUMP:.25,MIN:100,
   DIR_RISK:.005,DIR_MAX:2,DIR_CAP:.15,GATE_N:40,GATE_PF:1.5,GATE_AVG:3e-4,KEEP_PF:1.1,DAY_STOP:-.02,STREAK:4,PAUSE:6*36e5,
   COINS:["BTC","ETH","SOL","HYPE"]};
@@ -719,7 +727,7 @@ async function tick(){
   if(busy)return;busy=true;
   try{
     const round=()=>{stampPrices();step();microDay();microAlloc();record();save();render()};
-    await pullMids();round();
+    await pullMids();if(!S.mkt)await pullMarket();round();
     await pullMinute();round();
     if(Date.now()-lastSlow>5*60e3){lastSlow=Date.now();
       await pullMarket();await carryStep();round();
@@ -772,7 +780,7 @@ function chart(){
   const curve=S.curve,cap=S.acc.capital;
   if(curve.length<2){$("chart").innerHTML='<div class="empty">The chart fills in as the bot runs (a point every 10 minutes).</div>';return}
   const W=800,H=220,L=56,xs=curve.map(c=>Date.parse(c[0])),ys=curve.map(c=>c[1]);
-  const x0=Math.min(...xs),x1=Math.max(...xs),lo=Math.min(...ys,cap),hi=Math.max(...ys,cap),pad=(hi-lo)*.12||20;
+  const x0=Math.min(...xs),x1=Math.max(...xs),lo=Math.min(...ys,cap*.99),hi=Math.max(...ys,cap*1.01),pad=(hi-lo)*.12||20;
   const X=t=>L+(t-x0)/((x1-x0)||1)*(W-L-8),Y=v=>H-22-(v-(lo-pad))/((hi+pad)-(lo-pad))*(H-34);
   const d=curve.map((c,i)=>(i?"L":"M")+X(xs[i]).toFixed(1)+" "+Y(c[1]).toFixed(1)).join(" ");
   const col=ys.at(-1)>=cap?"var(--up)":"var(--down)",ticks=[cap,lo-pad*.5,hi+pad*.5].filter((v,i,a)=>i===0||Math.abs(Y(v)-Y(cap))>=14).sort((x,y)=>x-y);
@@ -792,8 +800,9 @@ function render(){
   const secs=Math.max(0,Math.round((nextAt-Date.now())/1000));
   $("liveTxt").textContent=busy?"Checking markets and players now…":`Last check ${new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})}. Prices and traders every minute, wallets and filings every 5 minutes.`;
   $("kEq").textContent=usd(T);$("kEqS").textContent=`long-term ${usd(E,0)} · short-term ${usd(T-E,0)}`;
-  $("kRet").textContent=pct(ret,2);$("kRet").className="v "+cls(ret);$("kRetS").textContent=`started ${usd(a.capital,0)} on ${a.start} · fees ${usd(a.fees+(S.micro?.fees||0))}`;
-  $("kCash").textContent=usd(a.cash,0);$("kCashS").textContent=`long-term book: ${(a.cash/E*100).toFixed(0)}% of it, min 20%`;
+  $("kRet").textContent=pct(ret,2);$("kRet").className="v "+cls(ret);const bm=Object.entries(a.bench||{}).filter(([b,p])=>S.live[b]).map(([b,p])=>`${b==="SPY"?"S&P 500":b} ${pct(S.live[b]/p-1)}`);
+  $("kRetS").textContent=bm.length?`same time, market: ${bm.join(" · ")}`:`started ${usd(a.capital,0)} on ${a.start}`;
+  $("kCash").textContent=usd(a.cash,0);$("kCashS").textContent=`earns 3.5% a year: +${usd(a.interest||0)} so far · fees ${usd(a.fees+(S.micro?.fees||0))}`;
   const sells=S.trades.filter(t=>t.pl!=null),wins=sells.filter(t=>t.pl>0).length,real=sells.reduce((s,t)=>s+t.pl,0);
   $("kWL").textContent=`${wins} / ${sells.length-wins}`;$("kWLS").innerHTML=`won / lost · realized <span class="${cls(real)}">${usd(real)}</span>`;
   const skip=skipSet(),tr=S.players.filter(p=>!skip.has(p.id));
@@ -810,7 +819,7 @@ function render(){
   $("log").innerHTML=lg.length?lg.map(l=>`<div class="row"><span class="sub">${esc(when(l[0]))}</span><div class="why">${esc(l[1])}</div><span></span></div>`).join(""):'<div class="empty">Nothing yet.</div>';
   renderSignals();renderPlayers();
   $("scout").innerHTML=S.scout.length?S.scout.slice().reverse().map(s=>`<div class="row"><span class="tag ${s.status==="promoted"?"t-buy":s.status==="rejected"?"t-sell":"t-move"}">${esc(s.status)}</span><div><b>${esc(s.name)}</b><div class="why">${esc(s.why)}</div><div class="why">${esc(s.check)}</div>${s.src?`<a class="sub" href="${esc(s.src[1])}" target="_blank" rel="noopener">${esc(s.src[0])}</a>`:""}</div><span class="sub">${esc((s.found||"").slice(0,10))}</span></div>`).join(""):'<div class="empty">The scout runs once a day while this page is open.</div>';
-  const rl=[["Every proven player","copied, size by track record"],["Veto","skip if 60% go the other way"],["Others agree","up to 2× size"],["Signal window",P.WIN+" days"],["Older signals weigh less","half after "+P.HALF_LIFE+" days"],["Hard stop-loss",pct(P.STOP,0)],["Trailing stop","10–25% by volatility"],["Take profit","sell ⅓ at +30%"],["Max per stock","15%"],["Max per coin","10%"],["Max all crypto","60%"],["Cash floor","20%"],["Daily loss brake","no buys after −4%"],["Emergency stop","−20% from peak"],["Skip if price ran","over +20%"],["Fee per trade","0.1%"],["Short-term book","20%, 30% after a profitable week"],["Carry entry","funding ≥12% a year for 3 days"],["Carry exit","under 3% a year, or negative"],["Strategy gets money","40 tests, PF ≥1.5, +3 bp after fees"],["Short-term risk per trade","0.5% of the book"],["Short-term brakes","−2% day, 4 losses → 6h pause"]];
+  const rl=[["Every proven player","copied, size by track record"],["Veto","skip if 60% go the other way"],["Others agree","up to 2× size"],["Signal window",P.WIN+" days"],["Older signals weigh less","half after "+P.HALF_LIFE+" days"],["Hard stop-loss",pct(P.STOP,0)],["Trailing stop","10–25% by volatility"],["Take profit","sell ⅓ at +30%"],["Max per stock","15%"],["Max per coin","10%"],["Max all crypto","60%"],["Cash floor","20%"],["Daily loss brake","no buys after −4%"],["Emergency stop","−20% from peak"],["Skip if price ran","over +20%"],["Fee per trade","0.08% coins, 0.02% stocks"],["Idle cash earns","3.5% a year"],["Coins copied","daily volume ≥$10M"],["Player trims","copied only if ≥30%, same share"],["Short-term book","20%, 30% after a profitable week"],["Carry entry","funding ≥10% a year for 3 days"],["Carry exit","under 3% a year, or negative"],["Strategy gets money","40 tests, PF ≥1.5, +3 bp after fees"],["Short-term risk per trade","0.5% of the book"],["Short-term brakes","−2% day, 4 losses → 6h pause"]];
   $("rules").innerHTML=rl.map(r=>`<div><span class="sub">${r[0]}</span><b class="num">${esc(r[1])}</b></div>`).join("");
 }
 function renderMicro(){
@@ -819,11 +828,11 @@ function renderMicro(){
   $("mSub").textContent=`trades on its own · ${pc(m.share)} of the account`;
   const carry=Object.entries(m.carry);
   let h=`<div class="mk"><div><div class="l">Value</div><div class="v">${usd(E,0)}</div><div class="l">${(E/T*100).toFixed(0)}% of the account</div></div>
-   <div><div class="l">Funding collected</div><div class="v ${cls(m.fund)}">${usd(m.fund)}</div><div class="l">from ${carry.length} carry position${carry.length===1?"":"s"}</div></div>
+   <div><div class="l">Funding collected</div><div class="v ${cls(m.fund)}">${usd(m.fund)}</div><div class="l">${carry.length?`+${usd(carry.reduce((s,[c,p])=>s+p.q*(S.live[c]||p.e)*(S.mkt?.[c]?.f||0)*(Date.now()-p.lastF)/36e5,0))} accruing for the next hourly payment`:"no carry positions yet"}</div></div>
    <div><div class="l">Strategy trades P/L</div><div class="v ${cls(dir)}">${usd(dir)}</div><div class="l">${open.length} open now</div></div>
    <div><div class="l">Cash in book</div><div class="v">${usd(m.cash,0)}</div><div class="l">fees ${usd(m.fees)}</div></div></div>`;
   h+=`<div class="mh">Funding carry</div>`+(carry.length?`<table><thead><tr><th>Coin</th><th class="r">Size</th><th class="r">Pays per year</th><th class="r">Collected</th><th class="r hide-sm">Since</th></tr></thead><tbody>${carry.map(([c,p])=>`<tr><td><b class="k-crypto">${esc(c)}</b></td><td class="r num">${usd(p.n,0)}</td><td class="r num">${pc(p.apr,1)}</td><td class="r num ${cls(p.earned)}">${usd(p.earned)}</td><td class="r sub hide-sm">${esc(when(p.ts))}</td></tr>`).join("")}</tbody></table>`
-    :`<div class="empty">${m.scan?`No coin pays enough right now. Best now: ${m.scan.top.slice(0,3).map(x=>`${esc(x[0])} ${pc(x[1],0)}`).join(", ")||"none above 12%"} a year.`:"First market scan runs in a minute."}</div>`);
+    :`<div class="empty">${m.scan?`No coin pays enough right now. Best now: ${m.scan.top.slice(0,3).map(x=>`${esc(x[0])} ${pc(x[1],0)}`).join(", ")||"none above 10%"} a year.`:"First market scan runs in a minute."}</div>`);
   if(open.length)h+=`<div class="mh">Open strategy trades</div><table><tbody>${open.map(x=>{const px=S.live[x.c]||x.e,pl=x.live.n*x.d*(px/x.e-1);return `<tr><td><span class="tag t-${x.d>0?"buy":"short"}">${x.d>0?"long":"short"}</span> <b>${esc(x.c)}</b></td><td class="r num">${usd(x.live.n,0)}</td><td class="r num ${cls(pl)}">${usd(pl)}</td><td class="r sub">${esc(STRATS.find(s=>s.id===x.s).name)}</td></tr>`}).join("")}</tbody></table>`;
   const since=Date.now()-LAB.KEEP;
   h+=`<div class="mh">Strategy lab: every strategy trades on paper first</div><table><thead><tr><th>Strategy</th><th class="r">Tests, 7 days</th><th class="r hide-sm">Win</th><th class="r">Per trade after fees</th><th class="r hide-sm">22-month check</th><th class="r">Status</th></tr></thead><tbody>${STRATS.map(s=>{const st=labStats(S.lab.res,s.id,since),hh=LAB_HIST[s.id],on=S.lab.on[s.id];
