@@ -481,8 +481,9 @@ const FUNDS=[
 ];
 const SEC_G={f4:"Billionaires & CEOs",f13:"Billionaire funds"};
 const fixTk=s=>{const t=String(s||"").split(/[,;]/)[0].toUpperCase().trim().replace(/[-\/ ]/g,".");return /^[A-Z]{1,5}(\.[A-Z])?$/.test(t)&&!/^(NONE|NA|N.A)$/.test(t)?t:""};
-async function secGet(u,text){   // the GitHub run reaches SEC directly; an open page tries the CORS proxies
-  for(const i of window.SERVER_RUN?[0]:[0,1,2]){const c=new AbortController(),tm=setTimeout(()=>c.abort(),30000);
+async function secGet(u,text){   // the GitHub run fetches SEC through Node (bot/run.js); an open page tries the CORS proxies
+  if(window.nodeGet){const x=await window.nodeGet(u);await sleep(130);if(x.s===404)return null;if(x.s!==200)throw new Error("SEC HTTP "+x.s+" "+u);return text?x.b:JSON.parse(x.b)}
+  for(const i of [0,1,2]){const c=new AbortController(),tm=setTimeout(()=>c.abort(),30000);
     try{const r=await fetch(PROXIES[i](u),{signal:c.signal});if(r.status===404)return null;if(!r.ok)throw 0;const x=text?await r.text():await r.json();await sleep(130);return x}catch(e){}finally{clearTimeout(tm)}}
   throw new Error("SEC unreachable");
 }
@@ -575,7 +576,7 @@ async function pullSEC(){
   S.sec=S.sec||{p:{},cusip:{},day:null};
   if(S.sec.day===today()){setH("sec",Object.keys(S.sec.p).length?"ok":"bad");secBooks();return}
   setH("sec","busy");
-  try{await secSubs(1067983)}catch(e){setH("sec","bad");secBooks();return}   // an open page usually cannot reach SEC; the GitHub run can
+  try{await secSubs(1067983)}catch(e){console.error("SEC unreachable:",e.message);setH("sec","bad");secBooks();return}   // an open page usually cannot reach SEC; the GitHub run can
   const ids=new Set(S.players.map(p=>p.id)),add=(id,name,role,g,cik)=>{if(ids.has(id))return;ids.add(id);
     S.players.push({id,name,role,group:g,kind:"stocks",wallets:[],src:["SEC EDGAR",`https://www.sec.gov/edgar/browse/?CIK=${cik}`],added:today()})};
   let n=0;
