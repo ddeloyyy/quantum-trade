@@ -140,9 +140,6 @@ dialog label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px}
     <span class="src" id="s-hl"><i></i>Crypto prices</span>
     <span class="src" id="s-wh"><i></i>Hyperliquid traders</span>
     <span class="src" id="s-wl"><i></i>Wallets</span>
-    <span class="src" id="s-oc"><i></i>Officials' filings</span>
-    <span class="src" id="s-sec"><i></i>Billionaires &amp; funds (SEC)</span>
-    <span class="src" id="s-st"><i></i>Stock prices</span>
   </div>
   <section class="kpis" aria-label="Account">
     <div class="kpi"><div class="l">Account value</div><div class="v" id="kEq">…</div><div class="s" id="kEqS"></div></div>
@@ -164,7 +161,7 @@ dialog label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px}
     <div class="col">
       <section class="card"><h2><span>Copied portfolio</span><span class="sub" id="tgSub"></span></h2><div id="target"></div></section>
       <section class="card"><h2><span>Signals from players</span>
-        <span class="tabs" id="sigTabs"><button aria-pressed="true" data-k="all">All</button><button aria-pressed="false" data-k="stock">Stocks</button><button aria-pressed="false" data-k="crypto">Crypto</button></span></h2>
+        <span class="tabs" id="sigTabs" hidden><button aria-pressed="true" data-k="all">All</button></span></h2>
         <div class="list" id="signals"></div></section>
       <section class="card"><h2><span>Crypto traders: tested on their own trades</span><span class="sub">copied only if their trades beat bitcoin over the last 6 months</span></h2><div class="list" id="scout"></div></section>
       <section class="card"><h2><span>Players</span><span class="sub">×weight = graded track record</span></h2>
@@ -172,7 +169,7 @@ dialog label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px}
       <section class="card"><h2><span>Safety rules</span></h2><div class="rules" id="rules"></div></section>
     </div>
   </div>
-  <div class="foot"><span>Demo account. No real money moves. Data: Hyperliquid, Blockscout, OGE 278-T via Open Cabinet, SEC EDGAR (Form 4, 13F), OpenFIGI, Yahoo Finance.</span><button class="btn" id="bReset">Reset demo account</button></div>
+  <div class="foot"><span>Demo account. No real money moves. Data: Hyperliquid (leaderboard, every trader's fills, prices), Blockscout.</span><button class="btn" id="bReset">Reset demo account</button></div>
 </main>
 
 <dialog id="dlgAdd">
@@ -195,7 +192,7 @@ dialog label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px}
 const P={CAPITAL:10000,WIN:30,THR:.6,HALF_LIFE:10,
   TIERS:[[10e6,"large",.16,1],[1e6,"medium",.08,.5],[50e3,"regular",.03,.25],[0,"small",.015,.25]],BIG:50e3,
   STOP:-.15,TRAIL_K:2.5,TRAIL_MIN:.10,TRAIL_MAX:.25,TP_LEVEL:.30,TP_FRAC:1/3,
-  MAX_ASSET:.15,MAX_ASSET_CRYPTO:.10,MAX_CRYPTO:.60,MIN_CASH:.10,DAY_LOSS:-.04,KILL:-.20,
+  MAX_ASSET:.15,MAX_ASSET_CRYPTO:.10,MAX_CRYPTO:.90,MIN_CASH:.10,DAY_LOSS:-.04,KILL:-.20,
   MIN_TRADE:100,HOLD_W:.04,COOLDOWN:3600e3,FEE_CRYPTO:.0008,FEE_STOCK:.0002,CASH_APY:.035,MIN_LIQ:10e6,MIN_BOOK:5e3,MAX_N:25,MAX_PLAYER:.12,STOPS:false,PER_BACKER:.05,BLOCK_DAYS:30,MIN_W:.015,BAND:.25,TARGET_VOL:.45,CHASE_SKIP:.20,CHASE_HALF:.10,HIT_H:20,STALE:120};
 const WATCH_GROUPS=new Set(["Market makers","Funds & treasuries","Crypto founders","Trump family & WLFI","Whales","Traders"]);   // named wallets mostly move money between their own accounts and cannot be tested: shown, not copied
 const KEY="quantum-trade-live-v2";
@@ -310,7 +307,7 @@ function exits(){if(!P.STOPS)return;
 }
 function accrueCash(){const now=Date.now(),a=S.acc;if(!a)return;const last=a.yTs||now;a.yTs=now;
   const k=P.CASH_APY*Math.min(now-last,7*DAY)/(365*DAY);if(k>0){const x=a.cash*k;a.cash+=x;a.interest=(a.interest||0)+x}
-  a.bench=a.bench||{};for(const b of ["BTC","SPY"])if(!a.bench[b]&&S.live[b])a.bench[b]=S.live[b]}
+  a.bench=a.bench||{};for(const b of ["BTC"])if(!a.bench[b]&&S.live[b])a.bench[b]=S.live[b]}
 /* The copied portfolio: every tracked player gets a vote budget (track record × size of their book, log scale),
    split over what they hold now in proportion to dollars. Shorts subtract. Then caps are applied. */
 function tradable(a){if(STABLE.has(a)||(S.block[a]||0)>Date.now())return false;
@@ -323,7 +320,7 @@ function target(){
     if(adm&&stockP(p.id)&&!adm.includes(p.id))continue;   // stock players must have passed the track-record check in the daily test
     const h=Object.entries(b.h).filter(([a])=>tradable(a)&&!/ETF|MUTUALFUND/.test(S.ty?.[a]||"")),gross=h.reduce((s,[,v])=>s+Math.abs(v),0);if(gross<P.MIN_BOOK)continue;
     vot.push([p,h,gross,weight(p.id)*Math.log10(1+gross/1e4)*(stockP(p.id)?spread(h.length):1)])}
-  return allocate(vot,isCrypto,"SPY");
+  return allocate(vot,isCrypto,null);   // crypto only: money no tested trader is using stays in cash
 }
 function allocate(vot,isCrypto,base){   // shared by the live bot and the test on the past
   const sc={},who={};let tot=0,np=0;
@@ -363,7 +360,7 @@ function step(){
   const acc=S.acc,t=today();
   for(const k in acc.pos){const p=acc.pos[k],n=pxNow(k);if(n){p.last=n;p.hi=Math.max(p.hi||n,n)}}
   if(acc.day!==t){acc.day=t;acc.dayEq=equity()}
-  purge();if(S.sec)secBooks();
+  purge();
   grade();
   for(const e of S.events){if(S.seen[e.key]||e.t==="move"||e.hold)continue;   // every real trade is graded after 20 days
     const p0=pxAt(e.a,e.d);if(p0){S.pending.push([e.key,e.w,e.a,e.t,e.d,p0]);S.seen[e.key]=1}}
@@ -591,7 +588,11 @@ function secEvents(id,x){   // fresh buys and sells become signals in the feed
 // players the owner removed by hand after the test on the past: never followed, never tested
 const REMOVED=new Set(["oge-mcmaster-sean","oge-turner-eric-scott","sec-tim-cook","sec-warren-buffett-berkshire-hathaway","sec-michael-burry-scion",
   "sec-george-soros-soros-fund","sec-dan-loeb-third-point","sec-chase-coleman-tiger-global","sec-stephen-mandel-lone-pine"]);
-function purge(){S.players=S.players.filter(p=>!REMOVED.has(p.id));for(const id of REMOVED){delete S.books?.[id];delete S.sec?.p?.[id]}}
+function purge(){S.players=S.players.filter(p=>!REMOVED.has(p.id)&&!/^(oge|sec)-/.test(p.id)&&p.kind!=="stocks");for(const id of REMOVED){delete S.books?.[id];delete S.sec?.p?.[id]}
+  // crypto only: officials, billionaires and funds are gone; the stocks the bot still holds are sold by the next rebalance
+  for(const id in S.books||{})if(/^(oge|sec)-/.test(id))delete S.books[id];delete S.sec;delete S.holdings;
+  if(S.events?.some(e=>e.k==="stock"))S.events=S.events.filter(e=>e.k!=="stock");
+  if(S.pending?.length)S.pending=S.pending.filter(x=>!/^(oge|sec)-/.test(x[1]));}
 async function pullSEC(){
   purge();
   S.sec=S.sec||{p:{},cusip:{},day:null};
@@ -612,94 +613,63 @@ async function pullSEC(){
 }
 
 /* ================= Test on the past: the same rules replayed day by day over the last 12 months ================= */
-let btBusy=false,btMsg="";const BT_VER=7;   // bump when the rules change so the test reruns
+let btBusy=false,btMsg="";const BT_VER=8;   // bump when the rules change so the test reruns
 function allocTk(a){return /^[A-Z]{1,4}(\.[A-Z])?$/.test(a)}
-async function backtest(force){
-  const hasSec=!!Object.keys(S.sec?.p||{}).length;   // rerun as soon as billionaires and funds arrive
-  const hlW=Object.values(S.hlx?.w||{}),hlReady=hlW.every(x=>x.day),hasHl=hlReady&&hlW.some(x=>x.h);
-  if(!force&&hlW.length&&!hlReady)return;   // wait until every crypto trader's history has loaded once
-  if(btBusy||(!force&&S.btDay===today()&&S.btVer===BT_VER&&!!S.bt?.sec===hasSec&&!!S.bt?.hl===hasHl))return;btBusy=true;btMsg="Loading officials' filings…";render();
+async function backtest(force){   // crypto only: the Hyperliquid traders, measured against simply holding bitcoin
+  const W=S.hlx?.w||{},hlW=Object.values(W),hlReady=hlW.length&&hlW.every(x=>x.day);
+  if(!hlReady){if(!S.bt)btMsg=hlW.length?`Loading the traders' full trade history: ${hlW.filter(x=>x.h).length} of ${hlW.length} done…`:"";return}
+  if(btBusy||(!force&&S.btDay===today()&&S.btVer===BT_VER))return;btBusy=true;btMsg="Preparing the traders' trade history…";render();
   try{
-    const end=today(),start=iso(dn(end)-365),pl=[];
-    // 1) officials: net buying over the 12 months before each day, by the day the filing became public
-    try{const agg=(await ogeEvents(iso(dn(end)-760)))[4],by={};
-      for(const a of agg){const w="oge-"+slug(a.o);if(!allocTk(a.tk)||REMOVED.has(w))continue;(by[w]=by[w]||{name:a.o,rows:[]}).rows.push([a.seen,a.tk,a.buy-a.sell])}
-      for(const w in by){const p=S.players.find(q=>q.id===w),pp=by[w].name.split(", ");
-        pl.push({id:w,name:p?p.name:pp.length===2?pp[1]+" "+pp[0]:by[w].name,g:"Government officials",kind:"usd",rows:by[w].rows})}}catch(e){}
-    // 2) billionaires and funds from SEC (loaded by the GitHub run)
-    for(const id in S.sec?.p||{}){if(REMOVED.has(id))continue;const x=S.sec.p[id],p=S.players.find(q=>q.id===id),sn=secSnaps(x);if(p&&sn.length)pl.push({id,name:p.name,g:x.f13?SEC_G.f13:SEC_G.f4,kind:"sh",snaps:sn,x})}
-    // 3) Hyperliquid traders: what they held at the end of every day, rebuilt from their own fills
-    for(const a in S.hlx?.w||{}){const x=S.hlx.w[a];if(x.h&&x.from)pl.push({id:"hl-"+a.slice(2,10),name:x.name,g:HL_G,kind:"pos",cr:1,x})}
-    if(!pl.length)throw new Error("no player data");
-    // 3) daily prices for everything the players held or bought in size
-    const val=new Map(),bump=(t,v)=>{if(allocTk(t))val.set(t,(val.get(t)||0)+v)};
-    for(const p of pl){
-      if(p.cr)continue;   // coins are priced from Hyperliquid below
-      if(p.kind==="usd"){for(const [,t,v] of p.rows)if(v>0)bump(t,Math.log10(1+v/1e3))}
-      else{for(const [,sh,px] of p.snaps)Object.entries(sh).map(([t,n])=>[t,n*(px[t]||0)]).sort((a,b)=>b[1]-a[1]).slice(0,8).forEach(([t],i)=>bump(t,8-i));
-        for(const f of p.x.f4||[])if(f.tx.some(x=>x[1]==="P"))bump(f.tk,6);
-        for(const f of p.x.f13||[])for(const c in f.pos)if(S.sec.cusip[c])bump(S.sec.cusip[c],1)}}
-    const TY={},tks=["SPY",...[...val].sort((a,b)=>b[1]-a[1]).map(x=>x[0]).filter(t=>t!=="SPY").slice(0,400)],H={};let k=0;
-    for(const t of tks){btMsg=`Downloading price history ${++k} of ${tks.length}…`;if(k%10===1)render();const [,h,ty]=await yahoo(t,"2y");if(h.length)H[t]=h;if(ty)TY[t]=ty;await sleep(80)}
-    const cw=new Map([["BTC",1e9]]);for(const p of pl)if(p.cr)for(const c in p.x.h)cw.set(c,(cw.get(c)||0)+1);
-    const coins=pl.some(p=>p.cr)?[...cw].sort((a,b)=>b[1]-a[1]).slice(0,150).map(x=>x[0]):[];k=0;
-    for(const c of coins){btMsg=`Downloading coin history ${++k} of ${coins.length}…`;if(k%10===1)render();
+    const end=today(),pl=[],H={};
+    for(const a in W){const x=W[a];if(x.h&&x.from)pl.push({id:"hl-"+a.slice(2,10),name:x.name,g:HL_G,kind:"pos",cr:1,x})}
+    if(!pl.length)throw new Error("no trader history");
+    const cw=new Map([["BTC",1e9]]);for(const p of pl)for(const c in p.x.h)cw.set(c,(cw.get(c)||0)+1);
+    const coins=[...cw].sort((a,b)=>b[1]-a[1]).slice(0,150).map(x=>x[0]);let k=0;
+    for(const c of coins){btMsg=`Downloading coin price history ${++k} of ${coins.length}…`;if(k%10===1)render();
       try{const d=await hl({type:"candleSnapshot",req:{coin:c,interval:"1d",startTime:Date.now()-(HLX.BACK+10)*DAY,endTime:Date.now()}},60000);
         if(d.length)H["c:"+c]=d.map(x=>[iso(Math.floor(x.t/DAY)),+x.c])}catch(e){}
       await sleep(250)}
-    if(!H.SPY)throw new Error("no S&P 500 history");
-    S.ty={...(S.ty||{}),...TY};
-    const days=H.SPY.map(x=>x[0]).filter(d=>d<=end),s0=days.findIndex(d=>d>=start),PX={};
+    if(!H["c:BTC"])throw new Error("no bitcoin price history");
+    const days=H["c:BTC"].map(x=>x[0]).filter(d=>d<=end),s0=days.findIndex(d=>d>=iso(dn(end)-365)),PX={};
     for(const t in H){const m=new Map(H[t]),arr=new Array(days.length);let last=null,j=0;const hs=H[t];
       for(let i=0;i<days.length;i++){while(j<hs.length&&hs[j][0]<=days[i]){last=hs[j][1];j++}arr[i]=m.has(days[i])?m.get(days[i]):last}PX[t]=arr}
-    const val$=(o,i)=>{const r={};for(const t in o){const q=PX[t]?.[i];if(q&&o[t]>0)r[t]=o[t]*q}return r};
-    for(const p of pl){
-      if(p.kind==="pos"){const bk=[],h=p.x.h,cs=Object.keys(h),ix=Object.fromEntries(cs.map(c=>[c,0]));
-        for(let i=0;i<days.length;i++){const d=dn(days[i]),o={};   // positions at the end of that day
-          if(d>=p.x.from)for(const c of cs){const s=h[c];while(ix[c]+1<s.length&&s[ix[c]+1][0]<=d)ix[c]++;const e=s[ix[c]];if(e&&e[0]<=d&&e[1])o["c:"+c]=e[1]}
-          bk.push(o)}
-        p.dec=p.hold=(D,i)=>{const o=bk[i-1]||{},r={};for(const t in o){const q=PX[t]?.[i];if(q)r[t]=o[t]*q}return r}}   // shorts come out negative
-      else if(p.kind==="usd"){   // old rule: net bought over 12 months; new rule: only buys of the last 90 days
-        p.hold=D=>{const lo=iso(dn(D)-365),o={};for(const [s,t,v] of p.rows)if(s>lo&&s<=D)o[t]=(o[t]||0)+v;for(const t in o)if(o[t]<1e3)delete o[t];return o};
-        p.dec=D=>{const lo=iso(dn(D)-DECIDE_DAYS),o={};for(const [s,t,v] of p.rows)if(v>0&&s>lo&&s<=D)o[t]=(o[t]||0)+v;for(const t in o)if(o[t]<1e3)delete o[t];return o}}
-      else{p.hold=(D,i)=>{let sn=null;for(const x of p.snaps){if(x[0]<=D)sn=x;else break}return sn?val$(sn[1],i):{}};
-        p.dec=(D,i)=>val$(secDecisions(p.x,D),i)}}
-    const fund=t=>/ETF|MUTUALFUND/.test(TY[t]||"");
-    // 4) admission check, decided only from what was known then: every quarter a player's own decisions over the
-    //    previous 6 months (held alone, no stops) must have beaten the S&P 500, otherwise the bot ignores them
-    btMsg="Checking every player's track record…";render();
-    const sStart=Math.max(1,s0-130),soloC={},spy=PX.SPY,admC=new Map();
-    for(const p of pl)soloC[p.id]=btSim([p],PX,days,sStart,{raw:1,noStops:1,skip:fund}).curve.map(c=>c[1]);
-    //    crypto traders are checked every month and must beat bitcoin and make money, with their history covering the whole 6 months
-    const btc=PX["c:BTC"];
-    const admitAt=(p,i)=>{const q=i-((i-s0)%(p.cr?21:63)),key=p.id+"|"+q;if(admC.has(key))return admC.get(key);
-      const c=soloC[p.id],k1=q-1-sStart,k0=k1-126,bm=p.cr?btc:spy;let ok=false;
-      if(k0>=0&&c[k1]&&c[k0]&&bm?.[q-127]&&bm[q-1]&&!(p.cr&&dn(days[q-127])<p.x.from)){const b=bm[q-1]/bm[q-127];
-        ok=c[k1]/c[k0]>(p.cr?Math.max(b,1):b)*1.0001&&c.slice(k0,k1+1).some((v,j,a)=>j&&v!==a[j-1])}
+    for(const p of pl){const bk=[],h=p.x.h,cs=Object.keys(h),ix=Object.fromEntries(cs.map(c=>[c,0]));
+      for(let i=0;i<days.length;i++){const d=dn(days[i]),o={};   // positions at the end of that day
+        if(d>=p.x.from)for(const c of cs){const s=h[c];while(ix[c]+1<s.length&&s[ix[c]+1][0]<=d)ix[c]++;const e=s[ix[c]];if(e&&e[0]<=d&&e[1])o["c:"+c]=e[1]}
+        bk.push(o)}
+      p.dec=p.hold=(D,i)=>{const o=bk[i-1]||{},r={};for(const t in o){const q=PX[t]?.[i];if(q)r[t]=o[t]*q}return r}}   // shorts come out negative
+    // admission, decided only from what was known then: every month a trader's own positions over the previous
+    // 6 months (copied alone, long-only, no leverage) must have beaten bitcoin and made money, with history covering all of it
+    btMsg="Checking every trader's own record…";render();
+    const L=180,sStart=Math.max(1,s0-L-3),soloC={},btc=PX["c:BTC"],admC=new Map();
+    for(const p of pl)soloC[p.id]=btSim([p],PX,days,sStart,{raw:1,noStops:1,bench:"c:BTC"}).curve.map(c=>c[1]);
+    const admitAt=(p,i)=>{const q=i-((i-s0)%30),key=p.id+"|"+q;if(admC.has(key))return admC.get(key);
+      const c=soloC[p.id],k1=q-1-sStart,k0=k1-L;let ok=false;
+      if(k0>=0&&c[k1]&&c[k0]&&btc[q-1-L]&&btc[q-1]&&dn(days[q-1-L])>=p.x.from)
+        ok=c[k1]/c[k0]>Math.max(btc[q-1]/btc[q-1-L],1)*1.0001&&c.slice(k0,k1+1).some((v,j,a)=>j&&v!==a[j-1]);
       admC.set(key,ok);return ok};
     btMsg="Replaying the rules…";render();
-    const NEW={skip:fund,noStops:1,admit:admitAt,base:"SPY"};
-    const groups=[["New rules · all players",pl,NEW],["New rules · without the track-record check",pl,{skip:fund,noStops:1,base:"SPY"}],
-      ...["Government officials",SEC_G.f4,SEC_G.f13,HL_G].map(g=>[`New rules · ${g}`,pl.filter(p=>p.g===g),NEW]).filter(x=>x[1].length),
-      ["Old rules (what they hold, with stop-losses)",pl,{old:1}]];
+    const NEW={noStops:1,admit:admitAt,bench:"c:BTC"};
+    const groups=[["Traders who pass the 6-month check (what the bot does)",pl,NEW],["All traders, no check",pl,{noStops:1,bench:"c:BTC"}],
+      ["Checked traders, with stop-losses",pl,{admit:admitAt,bench:"c:BTC"}]];
     const runs=groups.map(([label,ps,opt])=>({label,n:ps.length,...btSim(ps,PX,days,s0,opt)}));
     const last=days.length-1,admit=pl.filter(p=>admitAt(p,last)).map(p=>p.id);
     const solo=pl.map(p=>{const c=soloC[p.id].slice(s0-sStart);let pk=c[0],dd=0;for(const v of c){pk=Math.max(pk,v);dd=Math.min(dd,v/pk-1)}
       const moved=c.some((v,j)=>j&&v!==c[j-1]);return [p.name,p.g,+(c.at(-1)/c[0]-1).toFixed(4),+dd.toFixed(4),moved?1:0,admit.includes(p.id)?1:0,p.id]}).filter(x=>x[4]).sort((a,b)=>b[2]-a[2]);
-    const main=runs[0];
-    const hlOn=pl.some(p=>p.cr);
-    if(hlOn)for(const p of S.players)if(p.id.startsWith("hl-")){const q=pl.find(x=>x.id===p.id);
+    for(const p of S.players)if(p.id.startsWith("hl-")){const q=pl.find(x=>x.id===p.id);
       if(admit.includes(p.id))delete p.status;
-      else p.status=["rejected",!q?"No trade history loaded":dn(days[last-127])<q.x.from?"Over 10,000 trades in the last months: too fast to copy (a bot or scalper)":"Its own trades over the last 6 months did not beat bitcoin"]}
-    S.bt={ts:nowTs(),from:days[s0],to:days.at(-1),np:pl.length,tickers:Object.keys(H).length,sec:!!Object.keys(S.sec?.p||{}).length,admit,hl:hlOn,btc:btc?.[s0]&&btc[last]?btc[last]/btc[s0]-1:null,
+      else p.status=["rejected",!q?"No trade history loaded":dn(days[last-1-L])<q.x.from?"Over 10,000 trades in the last months: too fast to copy (a bot or scalper)":"Its own trades over the last 6 months did not beat bitcoin"]}
+    const main=runs[0];
+    S.bt={ts:nowTs(),from:days[s0],to:days.at(-1),np:pl.length,tickers:Object.keys(H).length,admit,hl:true,bench:"BTC",btc:btc[last]/btc[s0]-1,
       groups:runs.map(r=>({label:r.label,n:r.n,st:r.st})),solo,curve:main.curve,trades:main.trades.slice(-400),hold:main.hold};
-    S.btDay=today();S.btVer=BT_VER;btMsg="";feedPush("info",`Test on the past 12 months: ${pct(main.st.ret)} vs S&P 500 ${pct(main.st.spy)}`,`${main.st.n} trades replayed with today's rules on ${pl.length} players' filings.`,"player");
+    S.btDay=today();S.btVer=BT_VER;btMsg="";feedPush("info",`Test on the past 12 months: ${pct(main.st.ret)} vs bitcoin ${pct(main.st.spy)}`,`${main.st.n} trades replayed with today's rules on ${pl.length} traders' own trade history.`,"player");
   }catch(e){btMsg="The test could not run: "+e.message+". It tries again on the next run.";console.error(e)}
   finally{btBusy=false;save();render()}
 }
 // a player's own portfolio as they hold it, no caps and no cash: used to see how each person's stocks did by themselves
 function rawBook(vot){const f={},who={};for(const [p,h,gross] of vot)for(const [a,v] of h)if(v>0){f[a]=(f[a]||0)+v/gross/vot.length;(who[a]=who[a]||[]).push([p.name,v])}return {f,who,np:vot.length}}
 function btSim(players,PX,days,s0,opt={}){
+  const BM=PX[opt.bench||"SPY"];
   const acc={cash:P.CAPITAL,pos:{}},trades=[],curve=[],block={},px=(a,i)=>PX[a]?.[i]||null;let peak=P.CAPITAL,prevE=P.CAPITAL,paused=false,fees=0,dd=0;
   const E=i=>{let e=acc.cash;for(const a in acc.pos)e+=acc.pos[a].q*(px(a,i)||acc.pos[a].last);return e};
   const deal=(a,side,v,i,why)=>{const p=px(a,i);if(!p||v<=0)return;const fr=a.startsWith("c:")?P.FEE_CRYPTO:P.FEE_STOCK;let fee=v*fr,pl=null;
@@ -726,7 +696,7 @@ function btSim(players,PX,days,s0,opt={}){
     }
     const e=E(i);peak=Math.max(peak,e);dd=Math.min(dd,e/peak-1);prevE=e;
     if(!paused&&!opt.raw&&e/peak-1<=P.KILL){for(const a of Object.keys(acc.pos))deal(a,"sell",acc.pos[a].q*px(a,i),i,"Emergency stop: account −20% from peak");paused=true}
-    curve.push([days[i],Math.round(e),Math.round(P.CAPITAL*PX.SPY[i]/PX.SPY[s0])]);
+    curve.push([days[i],Math.round(e),Math.round(P.CAPITAL*BM[i]/BM[s0])]);
   }
   const sells=trades.filter(t=>t[5]!=null),last=curve.at(-1),Ef=last[1];
   return {curve,trades,hold:Object.entries(acc.pos).map(([a,o])=>[a,Math.round(o.q*o.last),+(o.last/o.avg-1).toFixed(4)]).sort((x,y)=>y[1]-x[1]).slice(0,12),
@@ -795,11 +765,7 @@ async function pullWallets(){
   setH("wl",ok?(fail>ok?"bad":"ok"):"bad");S.wallTs=Date.now();
 }
 async function pullStocks(){
-  const t=today(),recent=iso(dn(t)-3),need=new Set([...Object.keys(S.acc?.pos||{}),"SPY"]);
-  for(const r of S.target?.rows||[])need.add(r[0]);
-  for(const p of S.players)if(S.books[p.id])for(const [a] of Object.entries(S.books[p.id].h).sort((x,y)=>y[1]-x[1]).slice(0,3))need.add(a);
-  for(const e of S.events)if(e.d>=recent&&e.t!=="move")need.add(e.a);
-  for(const x of S.pending)if(iso(dn(x[4])+P.HIT_H)<=iso(dn(t)+1))need.add(x[2]);
+  const t=today(),recent=iso(dn(t)-3),need=new Set(Object.keys(S.acc?.pos||{}));   // crypto only: prices just for stocks still held, so they can be sold
   const stocks=[...need].filter(a=>!isCrypto(a)&&!S.mkt?.[a]).slice(0,150);if(!stocks.length){setH("st","ok");return}
   setH("st","busy");let ok=0;
   for(const a of stocks){const [last,hist,ty]=await yahoo(a);if(ty)(S.ty=S.ty||{})[a]=ty;if(hist.length)mergePx(a,hist);if(last){S.live[a]=last;ok++}await sleep(120)}
@@ -943,7 +909,7 @@ async function tick(){
     await pullMids();if(!S.mkt)await pullMarket();round();
     if(Date.now()-lastSlow>5*60e3){lastSlow=Date.now();
       await pullMarket();
-      await pullFilings();await pullSEC();try{await hlUniverse();await hlLoad()}catch(e){console.error("Crypto traders:",e.message)}round();
+      purge();try{await hlUniverse();await hlLoad()}catch(e){console.error("Crypto traders:",e.message)}round();
       await pullStocks();await pullCandles();round();
       await backtest();
       await pullWallets();round();}
@@ -1022,7 +988,7 @@ function render(){
   $("liveB").textContent=VIEW?"Always on.":"Trades only while this page is open.";
   if(VIEW)$("liveTxt").textContent=`Runs on GitHub every 10 minutes, even when this page is closed. Last run ${S.lastRun?when(new Date(S.lastRun).toISOString()):"—"}.`;else $("liveTxt").textContent=busy?"Checking markets and players now…":`Last check ${new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})}. Prices and traders every minute, wallets and filings every 5 minutes.`;
   $("kEq").textContent=usd(E);$("kEqS").textContent=`invested ${usd(E-a.cash,0)} in ${Object.keys(a.pos).length} assets`;
-  $("kRet").textContent=pct(ret,2);$("kRet").className="v "+cls(ret);const bm=Object.entries(a.bench||{}).filter(([b,p])=>S.live[b]).map(([b,p])=>`${b==="SPY"?"S&P 500":b} ${pct(S.live[b]/p-1)}`);
+  $("kRet").textContent=pct(ret,2);$("kRet").className="v "+cls(ret);const bm=Object.entries(a.bench||{}).filter(([b,p])=>b!=="SPY"&&S.live[b]).map(([b,p])=>`${b==="SPY"?"S&P 500":b} ${pct(S.live[b]/p-1)}`);
   $("kRetS").textContent=bm.length?`same time, market: ${bm.join(" · ")}`:`started ${usd(a.capital,0)} on ${a.start}`;
   $("kCash").textContent=usd(a.cash,0);$("kCashS").textContent=`earns 3.5% a year: +${usd(a.interest||0)} so far · fees ${usd(a.fees)}`;
   const sells=S.trades.filter(t=>t.pl!=null),wins=sells.filter(t=>t.pl>0).length,real=sells.reduce((s,t)=>s+t.pl,0);
@@ -1044,39 +1010,39 @@ function render(){
   const ws=Object.entries(W).map(([a,x])=>{const id="hl-"+a.slice(2,10);return {a,x,r:sr[id],ok:!!S.bt?.hl&&adm.includes(id)}}).sort((u,v)=>(v.ok-u.ok)||((v.r?.[2]??-9)-(u.r?.[2]??-9)));
   $("scout").innerHTML=ws.length?ws.map(({a,x,r,ok})=>{const tag=ok?"copied":!x.h?"loading":S.bt?.hl?"not copied":"testing";
     return `<div class="row"><span class="tag ${ok?"t-buy":tag==="not copied"?"t-sell":"t-move"}">${tag}</span><div><b>${esc(x.name)}</b><div class="why">${x.av?`account ${big(x.av)} · `:""}${x.h?`${(x.n||0).toLocaleString("en-US")} trades since ${esc(iso(x.from))}`:"trade history not loaded yet"}${r?` · copied alone for 12 months: <span class="${cls(r[2])}">${pct(r[2])}</span>`:""}</div><a class="sub" href="https://app.hyperliquid.xyz/explorer/address/${esc(a)}" target="_blank" rel="noopener">${esc(short(a))}</a></div><span></span></div>`}).join(""):'<div class="empty">The GitHub run loads the traders and their full trade history.</div>';
-  const rl=[["What it copies","choices made in the last 90 days: own-money buys, new or raised fund stakes, officials' stock buys"],["Who counts","stocks: beat the S&P 500 with their own choices over the last 6 months; crypto traders: beat bitcoin and made money with their own trades over the last 6 months"],["Crypto wallets with a name","shown, not copied: they mostly move money between their own accounts"],["Not copied","their own company stake, planned sales, index and bond funds"],["Player vote","track record × size (log) × spread"],["Shorts by players","lower the target"],["Max per asset","15% (needs 3+ holders)"],["Max all crypto","60%"],["Cash kept","10%, earns 3.5% a year"],["Money nobody strong is buying","goes into the S&P 500"],["Trades when","off target by >25% and >$100"],["Coins copied","daily volume ≥$10M"],["One player's stock","max 5%, +5% per extra holder"],["Stop-losses","off: the 12-month test showed they cost money"],["Daily loss brake","no buys after −4%"],["Emergency stop","−20% from peak"],["Fee per trade","0.08% coins, 0.02% stocks"],["Scout","top traders: 14-day check, must beat bitcoin"]];
+  const rl=[["Only crypto","coins traded on Hyperliquid; no stocks"],["Who is copied","top Hyperliquid traders whose own trades beat bitcoin and made money over the last 6 months (checked monthly on their full trade history)"],["Not copied","high-speed bots and scalpers, traders who lag bitcoin, named wallets that only move money around"],["How it copies","what the checked traders hold now, without leverage; their shorts lower the target"],["Player vote","track record × size (log)"],["Max per coin","15% (needs 3+ traders holding it), one trader's coin max 5%"],["Max in coins","90%"],["Cash kept","at least 10%, earns 3.5% a year; money no checked trader is using also stays in cash"],["Trades when","off target by >25% and >$100"],["Coins copied","daily volume ≥$10M"],["Stop-losses","off"],["Daily loss brake","no buys after −4%"],["Emergency stop","−20% from peak"],["Fee per trade","0.08%"]];
   $("rules").innerHTML=rl.map(r=>`<div><span class="sub">${r[0]}</span><b class="num">${esc(r[1])}</b></div>`).join("");
 }
 function renderBT(){
   const B=S.bt,el=$("bt");$("bBT").hidden=VIEW||!!window.SERVER_RUN;$("bBT").disabled=btBusy;
   if(!B){el.innerHTML=`<div class="empty">${esc(btMsg||(VIEW?"The GitHub run makes this test once a day; it appears after its next run.":"Starts after the players have loaded."))}</div>`;$("btSub").textContent="";return}
-  const m=B.groups[0].st,c=B.curve;$("btSub").textContent=`${B.from} → ${B.to} · ${B.np} players · updated ${when(B.ts)}`;
+  const m=B.groups[0].st,c=B.curve,bn=B.bench==="BTC"?"Bitcoin":"S&amp;P 500";$("btSub").textContent=`${B.from} → ${B.to} · ${B.np} players · updated ${when(B.ts)}`;
   const W=800,H=230,L=56,lo=Math.min(...c.map(x=>Math.min(x[1],x[2])),P.CAPITAL)*.98,hi=Math.max(...c.map(x=>Math.max(x[1],x[2])),P.CAPITAL)*1.02;
   const X=i=>L+i/((c.length-1)||1)*(W-L-8),Y=v=>H-22-(v-lo)/((hi-lo)||1)*(H-34),line=k=>c.map((x,i)=>(i?"L":"M")+X(i).toFixed(1)+" "+Y(x[k]).toFixed(1)).join(" ");
   const ticks=[lo,P.CAPITAL,hi].map(v=>Math.round(v/100)*100).filter((v,i,a)=>a.indexOf(v)===i);
   const tr=B.trades.slice().reverse(),beat=m.ret-m.spy;
   el.innerHTML=`<div class="mk">
     <div><div class="l">Bot would have made</div><div class="v ${cls(m.ret)}">${pct(m.ret)}</div><div class="l">${usd(P.CAPITAL,0)} → ${usd(m.end,0)}</div></div>
-    <div><div class="l">S&amp;P 500 same time</div><div class="v ${cls(m.spy)}">${pct(m.spy)}</div><div class="l">bot ${beat>=0?"beat it by":"lagged by"} ${pc(Math.abs(beat),1)}</div></div>
+    <div><div class="l">${bn} same time</div><div class="v ${cls(m.spy)}">${pct(m.spy)}</div><div class="l">bot ${beat>=0?"beat it by":"lagged by"} ${pc(Math.abs(beat),1)}</div></div>
     <div><div class="l">Worst drop on the way</div><div class="v down">${pct(m.dd)}</div><div class="l">from a high to a low</div></div>
     <div><div class="l">Trades / closed won–lost</div><div class="v">${m.n}</div><div class="l">${m.won}–${m.lost} · fees ${usd(m.fees,0)}</div></div></div>
-  <div class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Bot versus S&amp;P 500 over the last 12 months">
+  <div class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Bot versus ${bn} over the last 12 months">
     ${ticks.map(v=>`<line x1="${L}" x2="${W-8}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" ${v===P.CAPITAL?'stroke-dasharray="4 4"':''}/><text x="2" y="${Y(v)+4}" fill="var(--muted)" font-size="10" font-family="JetBrains Mono">${v.toLocaleString("en-US")}</text>`).join("")}
     <path d="${line(2)}" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="5 4" vector-effect="non-scaling-stroke"/>
     <path d="${line(1)}" fill="none" stroke="var(--accent)" stroke-width="2.2" vector-effect="non-scaling-stroke"/>
     <text x="${L}" y="${H-6}" fill="var(--muted)" font-size="10">${esc(c[0][0])}</text><text x="${W-8}" y="${H-6}" fill="var(--muted)" font-size="10" text-anchor="end">${esc(c.at(-1)[0])}</text></svg>
-    <div class="sub"><span style="color:var(--accent)">━</span> Bot copying the players &nbsp; <span>╌</span> S&amp;P 500 (just buying the index)</div></div>
-  <div class="mh">By kind of player</div>
-  <table><thead><tr><th>Copying only…</th><th class="r">Players</th><th class="r">Result</th><th class="r hide-sm">vs S&amp;P 500</th><th class="r hide-sm">Worst drop</th><th class="r">Trades</th></tr></thead><tbody>
+    <div class="sub"><span style="color:var(--accent)">━</span> Bot copying the players &nbsp; <span>╌</span> ${bn} (just buying it and holding)</div></div>
+  <div class="mh">Variants</div>
+  <table><thead><tr><th>Copying only…</th><th class="r">Players</th><th class="r">Result</th><th class="r hide-sm">vs ${bn}</th><th class="r hide-sm">Worst drop</th><th class="r">Trades</th></tr></thead><tbody>
     ${B.groups.map(g=>`<tr><td>${esc(g.label)}</td><td class="r num">${g.n}</td><td class="r num ${cls(g.st.ret)}">${pct(g.st.ret)}</td><td class="r num hide-sm ${cls(g.st.ret-g.st.spy)}">${pct(g.st.ret-g.st.spy)}</td><td class="r num hide-sm">${pct(g.st.dd)}</td><td class="r num">${g.st.n}</td></tr>`).join("")}</tbody></table>
-  ${B.solo?.length?`<div class="mh">Each player alone: how their own choices did (90-day buys held alone, no stops) · ✓ = passes the check today</div>
-  <div class="list" style="max-height:360px"><table><thead><tr><th>Player</th><th class="hide-sm">Kind</th><th class="r">12 months</th><th class="r">vs S&amp;P 500 · coins vs BTC</th><th class="r hide-sm">Worst drop</th></tr></thead><tbody>
+  ${B.solo?.length?`<div class="mh">Each trader alone: their own positions copied without leverage · ✓ = passes the check today and is copied</div>
+  <div class="list" style="max-height:360px"><table><thead><tr><th>Player</th><th class="hide-sm">Kind</th><th class="r">12 months</th><th class="r">vs ${bn}</th><th class="r hide-sm">Worst drop</th></tr></thead><tbody>
   ${B.solo.map(([n,g,r,dd,,ok])=>{const bm=g===HL_G&&B.btc!=null?B.btc:m.spy;return `<tr><td>${ok?'<b class="up">✓</b> ':''}${esc(n)}</td><td class="sub hide-sm">${esc(g)}</td><td class="r num ${cls(r)}">${pct(r)}</td><td class="r num ${cls(r-bm)}">${pct(r-bm)}</td><td class="r num hide-sm">${pct(dd)}</td></tr>`}).join("")}</tbody></table></div>`:""}
   ${B.hold?.length?`<div class="mh">What it would hold today</div><div class="why">${B.hold.map(([a,v,r])=>`<b class="k-stock">${esc(a.replace(/^c:/,""))}</b> ${big(v)} <span class="${cls(r)}">${pct(r)}</span>`).join(" · ")}</div>`:""}
   <details style="margin-top:12px"><summary class="sub" style="cursor:pointer">Every trade it would have made (${B.trades.length}${m.n>B.trades.length?` latest of ${m.n}`:""})</summary>
     <div class="list" style="max-height:360px">${tr.map(t=>`<div class="row"><span class="tag t-${t[2]}">${t[2]}</span><div><b>${esc(t[1].replace(/^c:/,""))}</b> <span class="num">${usd(t[3],0)}</span> at <span class="num">${usd(t[4])}</span>${t[5]!=null?` · <span class="num ${cls(t[5])}">${usd(t[5],0)}</span>`:""}<div class="why">${esc(t[6])}</div></div><span class="sub">${esc(t[0])}</span></div>`).join("")}</div></details>
-  <div class="note"><b>How it is tested:</b> day by day it only uses filings that were public by the day before, buys at that day's closing price, and uses today's rules and fees. Coins are bought without leverage, and a trader's shorts only lower the target.<br>
-  <b>Why it is not a promise:</b> ${B.sec?"the billionaires on the list were picked today, partly because their stocks went up, which flatters their line; the funds and officials are the fairer test. ":"billionaires and funds come from SEC and load in the GitHub run, so this test covers officials only for now. "}Funds report up to 45 days after a quarter ends. Crypto traders are rebuilt from their own fills, but they were picked from today's leaderboard, which flatters them; that is why each one must also pass the monthly check on the 6 months before. One good year proves little; watch the live demo for a few months before you put in real money.</div>
+  <div class="note"><b>How it is tested:</b> each trader's positions are rebuilt day by day from every trade they made on Hyperliquid. Each day the bot only uses what the traders held at the end of the day before, buys at that day's closing price, without leverage, and pays the fees. Every month it re-checks who passes, using only the 6 months before.<br>
+  <b>Why it is not a promise:</b> the traders were picked from today's leaderboard, so traders who blew up and vanished are missing, which flatters the result; the monthly check on earlier months is there to make it fairer. Traders with more than 10,000 trades have a shorter history and cannot pass. One good year proves little; watch the live demo for a few months before you put in real money.</div>
   ${btMsg?`<div class="note">${esc(btMsg)}</div>`:""}`;
 }
 let feedSeen=0;
@@ -1088,7 +1054,7 @@ function renderFeed(){
   clearTimeout(renderFeed.t);renderFeed.t=setTimeout(()=>{feedSeen=f.length?f[0].id:0},60e3);
 }
 function renderTarget(){
-  const T=S.target,E=equity();if(!T||!T.rows.length){$("target").innerHTML=`<div class="empty">Loading what the players hold: Hyperliquid positions now, wallets, officials’ net buying over 12 months, billionaires’ Form 4 holdings and their funds’ 13F reports.</div>`;$("tgSub").textContent="";return}
+  const T=S.target,E=equity();if(!T||!T.rows.length){$("target").innerHTML=`<div class="empty">Loading what the checked crypto traders hold on Hyperliquid…</div>`;$("tgSub").textContent="";return}
   $("tgSub").textContent=`built from ${T.np} players · updates every ${VIEW?"10 minutes":"minute"}`;
   $("target").innerHTML=`<table><thead><tr><th>Asset</th><th class="r">Target</th><th class="r">Now</th><th>Held by</th></tr></thead><tbody>${T.rows.map(([a,f,w,n])=>{const p=S.acc.pos[a],now=p?p.q*(pxNow(a)||p.last)/E:0;
     return `<tr><td><b class="${isCrypto(a)?"k-crypto":"k-stock"}">${esc(a)}</b></td><td class="r num">${pc(f,1)}</td><td class="r num ${Math.abs(now-f)>f*P.BAND?"sub":""}">${pc(now,1)}</td><td class="why">${esc(w.join(", "))}${n>3?` +${n-3}`:""}</td></tr>`}).join("")}</tbody></table>
