@@ -11,8 +11,8 @@ const file=process.argv[2]||'data/state.json';
   // SEC asks every program to declare itself in the User-Agent (name + contact e-mail). curl is used because SEC's filter
   // rejects some Node defaults. Each declared name is tried once; the first one SEC accepts is kept for the whole run.
   const {execFile}=require('child_process');
-  const CONTACT=process.env.QT_CONTACT||'ddeloyyy@users.noreply.github.com';
-  const UAS=[`QuantumTrade ${CONTACT}`,`Quantum Trade research bot ${CONTACT}`,`ddeloyyy quantum-trade ${CONTACT}`];let uaOk=null;
+  const CONTACT=process.env.QT_CONTACT||'learnup.eu@gmail.com';
+  const UAS=[`LearnUp Quantum Trade ${CONTACT}`,`Arseniy Quantum Trade ${CONTACT}`,`QuantumTrade ${CONTACT}`];let uaOk=null;
   const curl=(u,ua)=>new Promise(res=>execFile('curl',['-sS','-L','--compressed','--max-time','40','-A',ua,'-H','Accept: application/json, text/xml, */*','-w','\n%{http_code}',u],{maxBuffer:64<<20},(e,out)=>{
     if(e&&!out)return res({s:0,b:String(e)});const i=out.lastIndexOf('\n');res({s:+out.slice(i+1)||0,b:out.slice(0,i)})}));
   await p.exposeFunction('nodeGet',async u=>{
