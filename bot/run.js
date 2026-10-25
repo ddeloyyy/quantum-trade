@@ -7,6 +7,10 @@ const file=process.argv[2]||'data/state.json';
   const b=await chromium.launch({args:['--disable-web-security']});   // no browser CORS limits on a server
   const p=await b.newPage({userAgent:'QuantumTrade demo bot github.com/ddeloyyy/quantum-trade bot@users.noreply.github.com'});   // SEC asks every program to name itself
   p.on('pageerror',e=>console.error('page error:',e.message));
+  p.on('console',m=>{if(m.type()==='error')console.log('page:',m.text())});
+  const UA='QuantumTrade demo bot bot@users.noreply.github.com';
+  await p.exposeFunction('nodeGet',async u=>{   // SEC and OpenFIGI calls go through Node with a proper User-Agent
+    try{const r=await fetch(u,{headers:{'User-Agent':UA,'Accept-Encoding':'gzip, deflate'}});return {s:r.status,b:r.ok?await r.text():''}}catch(e){return {s:0,b:String(e)}}});
   await p.addInitScript(([s])=>{window.SERVER_RUN=1;if(s)localStorage.setItem('quantum-trade-live-v2',s)},[prev]);
   await p.goto('file://'+path.resolve(__dirname,'..','index.html'));
   await p.waitForFunction(()=>{try{return !!(S&&S.acc)}catch(e){return false}},null,{timeout:30000});
