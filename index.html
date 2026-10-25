@@ -363,7 +363,7 @@ function step(){
   const acc=S.acc,t=today();
   for(const k in acc.pos){const p=acc.pos[k],n=pxNow(k);if(n){p.last=n;p.hi=Math.max(p.hi||n,n)}}
   if(acc.day!==t){acc.day=t;acc.dayEq=equity()}
-  if(S.sec)secBooks();
+  purge();if(S.sec)secBooks();
   grade();
   for(const e of S.events){if(S.seen[e.key]||e.t==="move"||e.hold)continue;   // every real trade is graded after 20 days
     const p0=pxAt(e.a,e.d);if(p0){S.pending.push([e.key,e.w,e.a,e.t,e.d,p0]);S.seen[e.key]=1}}
@@ -469,21 +469,21 @@ const BILLIONAIRES=[
   ["Alex Karp","Karp Alexander","CEO of Palantir","PLTR"],["Jamie Dimon","Dimon James","CEO of JPMorgan","JPM"],
   ["Michael Saylor","Saylor Michael","Chairman of Strategy, the biggest corporate bitcoin holder","MSTR"],["Brian Armstrong","Armstrong Brian","CEO of Coinbase","COIN"],
   ["Thomas Peterffy","Peterffy Thomas","Founder of Interactive Brokers","IBKR"],["Rupert Murdoch","Murdoch Keith Rupert","Fox and News Corp","FOX FOXA NWS NWSA"],
-  ["Miriam Adelson","Adelson Miriam","Las Vegas Sands","LVS"],["Tim Cook","Cook Timothy","CEO of Apple","AAPL"],["Lisa Su","Su Lisa","CEO of AMD","AMD"],
+  ["Miriam Adelson","Adelson Miriam","Las Vegas Sands","LVS"],["Lisa Su","Su Lisa","CEO of AMD","AMD"],
   ["Reed Hastings","Hastings Reed","Co-founder of Netflix","NFLX"],["Marc Benioff","Benioff Marc","CEO of Salesforce","CRM"],
   ["Satya Nadella","Nadella Satya","CEO of Microsoft","MSFT"],["Charles Schwab","Schwab Charles","Founder of Charles Schwab","SCHW"],
   ["Dan Gilbert","Gilbert Daniel","Founder of Rocket","RKT"],["Brian Chesky","Chesky Brian","CEO of Airbnb","ABNB"],["Jack Dorsey","Dorsey Jack","Founder of Block and Twitter","XYZ SQ"],
 ];
 // [name, words to find the fund in SEC search, who it is, CIK if known]
 const FUNDS=[
-  ["Warren Buffett · Berkshire Hathaway","Berkshire Hathaway","Buffett's company",1067983],["Bill Gates · Gates Foundation Trust","Gates Foundation Trust","Most of Gates' stock portfolio"],
-  ["Bill Ackman · Pershing Square","Pershing Square Capital","Hedge fund",1336528],["Michael Burry · Scion","Scion Asset Management","Hedge fund"],
+  ["Bill Gates · Gates Foundation Trust","Gates Foundation Trust","Most of Gates' stock portfolio"],
+  ["Bill Ackman · Pershing Square","Pershing Square Capital","Hedge fund",1336528],
   ["Ray Dalio · Bridgewater","Bridgewater Associates","World's biggest hedge fund"],["Stanley Druckenmiller · Duquesne","Duquesne Family Office","Family office"],
-  ["George Soros · Soros Fund","Soros Fund Management","Family office"],["David Tepper · Appaloosa","Appaloosa","Hedge fund"],
-  ["Dan Loeb · Third Point","Third Point","Hedge fund"],["Chase Coleman · Tiger Global","Tiger Global Management","Hedge fund"],
+  ["David Tepper · Appaloosa","Appaloosa","Hedge fund"],
+  
   ["Cathie Wood · ARK Invest","ARK Investment Management","Fund manager"],["Nelson Peltz · Trian","Trian Fund Management","Activist fund"],
   ["Seth Klarman · Baupost","Baupost Group","Hedge fund"],["Steve Cohen · Point72","Point72 Asset Management","Hedge fund"],
-  ["Philippe Laffont · Coatue","Coatue Management","Hedge fund"],["Stephen Mandel · Lone Pine","Lone Pine Capital","Hedge fund"],
+  ["Philippe Laffont · Coatue","Coatue Management","Hedge fund"],
 ];
 const SEC_G={f4:"Billionaires & CEOs",f13:"Billionaire funds"};
 const fixTk=s=>{const t=String(s||"").split(/[,;]/)[0].toUpperCase().trim().replace(/[-\/ ]/g,".");return /^[A-Z]{1,5}(\.[A-Z])?$/.test(t)&&!/^(NONE|NA|N.A)$/.test(t)?t:""};
@@ -588,7 +588,12 @@ function secEvents(id,x){   // fresh buys and sells become signals in the feed
       addEvent({key:`13f-${f.acc}-${t}`,d:f.d,w:id,t:dv>0?"buy":"sell",a:t,usd:Math.round(Math.abs(dv)),k:"stock",
         txt:`13F report: ${!s0?"new position":!s1?"sold the whole position":(s1>s0?"raised":"cut")+` the stake by ${pc(Math.abs(s1/s0-1))}`} in ${t} during the quarter`,src:["SEC 13F",dir(f)]})}
 }
+// players the owner removed by hand after the test on the past: never followed, never tested
+const REMOVED=new Set(["oge-mcmaster-sean","oge-turner-eric-scott","sec-tim-cook","sec-warren-buffett-berkshire-hathaway","sec-michael-burry-scion",
+  "sec-george-soros-soros-fund","sec-dan-loeb-third-point","sec-chase-coleman-tiger-global","sec-stephen-mandel-lone-pine"]);
+function purge(){S.players=S.players.filter(p=>!REMOVED.has(p.id));for(const id of REMOVED){delete S.books?.[id];delete S.sec?.p?.[id]}}
 async function pullSEC(){
+  purge();
   S.sec=S.sec||{p:{},cusip:{},day:null};
   if(S.sec.day===today()){setH("sec",Object.keys(S.sec.p).length?"ok":"bad");secBooks();return}
   setH("sec","busy");
@@ -607,7 +612,7 @@ async function pullSEC(){
 }
 
 /* ================= Test on the past: the same rules replayed day by day over the last 12 months ================= */
-let btBusy=false,btMsg="";const BT_VER=5;   // bump when the rules change so the test reruns
+let btBusy=false,btMsg="";const BT_VER=6;   // bump when the rules change so the test reruns
 function allocTk(a){return /^[A-Z]{1,4}(\.[A-Z])?$/.test(a)}
 async function backtest(force){
   const hasSec=!!Object.keys(S.sec?.p||{}).length;   // rerun as soon as billionaires and funds arrive
@@ -616,11 +621,11 @@ async function backtest(force){
     const end=today(),start=iso(dn(end)-365),pl=[];
     // 1) officials: net buying over the 12 months before each day, by the day the filing became public
     try{const agg=(await ogeEvents(iso(dn(end)-760)))[4],by={};
-      for(const a of agg){if(!allocTk(a.tk))continue;const w="oge-"+slug(a.o);(by[w]=by[w]||{name:a.o,rows:[]}).rows.push([a.seen,a.tk,a.buy-a.sell])}
+      for(const a of agg){const w="oge-"+slug(a.o);if(!allocTk(a.tk)||REMOVED.has(w))continue;(by[w]=by[w]||{name:a.o,rows:[]}).rows.push([a.seen,a.tk,a.buy-a.sell])}
       for(const w in by){const p=S.players.find(q=>q.id===w),pp=by[w].name.split(", ");
         pl.push({id:w,name:p?p.name:pp.length===2?pp[1]+" "+pp[0]:by[w].name,g:"Government officials",kind:"usd",rows:by[w].rows})}}catch(e){}
     // 2) billionaires and funds from SEC (loaded by the GitHub run)
-    for(const id in S.sec?.p||{}){const x=S.sec.p[id],p=S.players.find(q=>q.id===id),sn=secSnaps(x);if(p&&sn.length)pl.push({id,name:p.name,g:x.f13?SEC_G.f13:SEC_G.f4,kind:"sh",snaps:sn,x})}
+    for(const id in S.sec?.p||{}){if(REMOVED.has(id))continue;const x=S.sec.p[id],p=S.players.find(q=>q.id===id),sn=secSnaps(x);if(p&&sn.length)pl.push({id,name:p.name,g:x.f13?SEC_G.f13:SEC_G.f4,kind:"sh",snaps:sn,x})}
     if(!pl.length)throw new Error("no player data");
     // 3) daily prices for everything the players held or bought in size
     const val=new Map(),bump=(t,v)=>{if(allocTk(t))val.set(t,(val.get(t)||0)+v)};
@@ -718,16 +723,17 @@ async function pullMids(){
   catch(e){setH("hl","bad")}
 }
 async function pullFilings(){
+  purge();
   if(S.ocDay===today()){setH("oc","ok");return}setH("oc","busy");
   try{const [ev,people,holdings,,agg]=await ogeEvents(iso(dn(today())-365)),byP={},lo90=iso(dn(today())-DECIDE_DAYS);
-    for(const a of agg)if(a.seen>lo90&&a.buy>a.sell){const w="oge-"+slug(a.o),b=byP[w]||(byP[w]={});b[a.tk]=(b[a.tk]||0)+a.buy-a.sell}
+    for(const a of agg)if(a.seen>lo90&&a.buy>a.sell&&!REMOVED.has("oge-"+slug(a.o))){const w="oge-"+slug(a.o),b=byP[w]||(byP[w]={});b[a.tk]=(b[a.tk]||0)+a.buy-a.sell}
     for(const w in byP){for(const k in byP[w])if(byP[w][k]<1e3)delete byP[w][k];if(!Object.keys(byP[w]).length)delete byP[w]}const ids=new Set(S.players.map(p=>p.id));let n=0;
     S.holdings=holdings;const evLo=iso(dn(today())-40);
-    const addOfficial=w=>{if(ids.has(w))return;const nm=Object.keys(people).find(o=>"oge-"+slug(o)===w)||w,pp=nm.split(", ");
+    const addOfficial=w=>{if(ids.has(w)||REMOVED.has(w))return;const nm=Object.keys(people).find(o=>"oge-"+slug(o)===w)||w,pp=nm.split(", ");
       S.players.push({id:w,name:pp.length===2?pp[1]+" "+pp[0]:nm,role:people[nm]||"",group:"Government officials",kind:"stocks",wallets:[],src:["Open Cabinet / OGE 278-T","https://open-cabinet.org/"],added:today()});ids.add(w)};
     for(const w in S.books)if(w.startsWith("oge-"))delete S.books[w];
     for(const w in byP){addOfficial(w);S.books[w]={ts:Date.now(),src:"stocks bought in the last 90 days (OGE 278-T)",h:byP[w]}}
-    for(const e of ev){if(e.d<evLo)continue;if(addEvent(e)&&e.t!=="move")n++;
+    for(const e of ev){if(e.d<evLo||REMOVED.has(e.w))continue;if(addEvent(e)&&e.t!=="move")n++;
       addOfficial(e.w)}
     if(n)logMsg(`Loaded ${n} new trades from officials' filings`);S.ocDay=today();setH("oc","ok")}
   catch(e){setH("oc","bad")}
