@@ -593,7 +593,7 @@ async function pullSEC(){
 }
 
 /* ================= Test on the past: the same rules replayed day by day over the last 12 months ================= */
-let btBusy=false,btMsg="";const BT_VER=3;   // bump when the rules change so the test reruns
+let btBusy=false,btMsg="";const BT_VER=4;   // bump when the rules change so the test reruns
 function allocTk(a){return /^[A-Z]{1,4}(\.[A-Z])?$/.test(a)}
 async function backtest(force){
   const hasSec=!!Object.keys(S.sec?.p||{}).length;   // rerun as soon as billionaires and funds arrive
@@ -628,14 +628,19 @@ async function backtest(force){
     const off=pl.filter(p=>p.g==="Government officials"),fund=t=>/ETF|MUTUALFUND/.test(TY[t]||"");
     if(off.length)groups.push(["Officials · no stop-losses",off,{noStops:1}],["Officials · only buys of the last 90 days",off,{win:90}],
       ["Officials · without index and bond funds",off,{skip:fund}],["Officials · last 90 days, no funds, no stops",off,{win:90,skip:fund,noStops:1}]);
+    groups.push(["All · no stop-losses",pl,{noStops:1}],["All · fresh buys, no funds, no stops",pl,{win:90,skip:fund,noStops:1}]);
     const runs=groups.map(([label,ps,opt])=>({label,n:ps.length,...btSim(ps,PX,days,s0,opt||{})}));
+    btMsg="Testing every player alone…";render();
+    const solo=pl.map(p=>{const r=btSim([p],PX,days,s0,{raw:1,noStops:1,win:90}).st;return [p.name,p.g,+r.ret.toFixed(4),+r.dd.toFixed(4),r.n]}).filter(x=>x[4]>0).sort((a,b)=>b[2]-a[2]);
     const main=runs[0];
     S.bt={ts:nowTs(),from:days[s0],to:days.at(-1),np:pl.length,tickers:Object.keys(H).length,sec:!!Object.keys(S.sec?.p||{}).length,
-      groups:runs.map(r=>({label:r.label,n:r.n,st:r.st})),curve:main.curve,trades:main.trades.slice(-400),hold:main.hold};
+      groups:runs.map(r=>({label:r.label,n:r.n,st:r.st})),solo,curve:main.curve,trades:main.trades.slice(-400),hold:main.hold};
     S.btDay=today();S.btVer=BT_VER;btMsg="";feedPush("info",`Test on the past 12 months: ${pct(main.st.ret)} vs S&P 500 ${pct(main.st.spy)}`,`${main.st.n} trades replayed with today's rules on ${pl.length} players' filings.`,"player");
   }catch(e){btMsg="The test could not run: "+e.message+". It tries again on the next run.";console.error(e)}
   finally{btBusy=false;save();render()}
 }
+// a player's own portfolio as they hold it, no caps and no cash: used to see how each person's stocks did by themselves
+function rawBook(vot){const f={},who={};for(const [p,h,gross] of vot)for(const [a,v] of h)if(v>0){f[a]=(f[a]||0)+v/gross/vot.length;(who[a]=who[a]||[]).push([p.name,v])}return {f,who,np:vot.length}}
 function btSim(players,PX,days,s0,opt={}){
   const acc={cash:P.CAPITAL,pos:{}},trades=[],curve=[],block={},px=(a,i)=>PX[a]?.[i]||null;let peak=P.CAPITAL,prevE=P.CAPITAL,paused=false,fees=0,dd=0;
   const E=i=>{let e=acc.cash;for(const a in acc.pos)e+=acc.pos[a].q*(px(a,i)||acc.pos[a].last);return e};
@@ -654,14 +659,14 @@ function btSim(players,PX,days,s0,opt={}){
       const braked=E(i)/prevE-1<=P.DAY_LOSS,vot=[];
       for(const p of players){const h=Object.entries(p.at(days[i-1],i,opt.win)).filter(([a])=>px(a,i)&&!(block[a]>i)&&allocTk(a)&&!(opt.skip&&opt.skip(a))),gross=h.reduce((s,[,v])=>s+Math.abs(v),0);   // only what was public by the day before
         if(gross>=P.MIN_BOOK)vot.push([p,h,gross,Math.log10(1+gross/1e4)])}
-      const T=allocate(vot,()=>false),Eq=E(i),who=a=>(T.who[a]||[]).slice(0,2).map(x=>x[0]).join(", ");
+      const T=opt.raw?rawBook(vot):allocate(vot,()=>false),Eq=E(i),who=a=>(T.who[a]||[]).slice(0,2).map(x=>x[0]).join(", ");
       for(const a of Object.keys(acc.pos)){const cur=acc.pos[a].q*px(a,i),tv=Eq*(T.f[a]||0),x=cur-tv;
         if(x>Math.max(P.MIN_TRADE,P.BAND*cur))deal(a,"sell",tv<P.MIN_TRADE?cur:x,i,T.f[a]?`Players cut it to ${pc(T.f[a],1)}`:"No tracked player holds it any more")}
       if(!braked)for(const [a,f] of Object.entries(T.f).sort((x,y)=>y[1]-x[1])){const tv=Eq*f,gap=tv-(acc.pos[a]?acc.pos[a].q*px(a,i):0);
-        if(gap<=Math.max(P.MIN_TRADE,P.BAND*tv))continue;const v=Math.min(gap,acc.cash-Eq*P.MIN_CASH);if(v<P.MIN_TRADE)break;deal(a,"buy",v,i,`Copying ${who(a)}: ${pc(f,1)}`)}
+        if(gap<=Math.max(P.MIN_TRADE,P.BAND*tv))continue;const v=Math.min(gap,acc.cash-Eq*(opt.raw?0:P.MIN_CASH));if(v<P.MIN_TRADE)break;deal(a,"buy",v,i,`Copying ${who(a)}: ${pc(f,1)}`)}
     }
     const e=E(i);peak=Math.max(peak,e);dd=Math.min(dd,e/peak-1);prevE=e;
-    if(!paused&&e/peak-1<=P.KILL){for(const a of Object.keys(acc.pos))deal(a,"sell",acc.pos[a].q*px(a,i),i,"Emergency stop: account −20% from peak");paused=true}
+    if(!paused&&!opt.raw&&e/peak-1<=P.KILL){for(const a of Object.keys(acc.pos))deal(a,"sell",acc.pos[a].q*px(a,i),i,"Emergency stop: account −20% from peak");paused=true}
     curve.push([days[i],Math.round(e),Math.round(P.CAPITAL*PX.SPY[i]/PX.SPY[s0])]);
   }
   const sells=trades.filter(t=>t[5]!=null),last=curve.at(-1),Ef=last[1];
@@ -941,6 +946,9 @@ function renderBT(){
   <div class="mh">By kind of player</div>
   <table><thead><tr><th>Copying only…</th><th class="r">Players</th><th class="r">Result</th><th class="r hide-sm">vs S&amp;P 500</th><th class="r hide-sm">Worst drop</th><th class="r">Trades</th></tr></thead><tbody>
     ${B.groups.map(g=>`<tr><td>${esc(g.label)}</td><td class="r num">${g.n}</td><td class="r num ${cls(g.st.ret)}">${pct(g.st.ret)}</td><td class="r num hide-sm ${cls(g.st.ret-g.st.spy)}">${pct(g.st.ret-g.st.spy)}</td><td class="r num hide-sm">${pct(g.st.dd)}</td><td class="r num">${g.st.n}</td></tr>`).join("")}</tbody></table>
+  ${B.solo?.length?`<div class="mh">Each player alone: how their own stocks did (held as they hold them, no stops)</div>
+  <div class="list" style="max-height:360px"><table><thead><tr><th>Player</th><th class="hide-sm">Kind</th><th class="r">12 months</th><th class="r">vs S&amp;P 500</th><th class="r hide-sm">Worst drop</th></tr></thead><tbody>
+  ${B.solo.map(([n,g,r,dd])=>`<tr><td>${esc(n)}</td><td class="sub hide-sm">${esc(g)}</td><td class="r num ${cls(r)}">${pct(r)}</td><td class="r num ${cls(r-m.spy)}">${pct(r-m.spy)}</td><td class="r num hide-sm">${pct(dd)}</td></tr>`).join("")}</tbody></table></div>`:""}
   ${B.hold?.length?`<div class="mh">What it would hold today</div><div class="why">${B.hold.map(([a,v,r])=>`<b class="k-stock">${esc(a)}</b> ${big(v)} <span class="${cls(r)}">${pct(r)}</span>`).join(" · ")}</div>`:""}
   <details style="margin-top:12px"><summary class="sub" style="cursor:pointer">Every trade it would have made (${B.trades.length}${m.n>B.trades.length?` latest of ${m.n}`:""})</summary>
     <div class="list" style="max-height:360px">${tr.map(t=>`<div class="row"><span class="tag t-${t[2]}">${t[2]}</span><div><b>${esc(t[1])}</b> <span class="num">${usd(t[3],0)}</span> at <span class="num">${usd(t[4])}</span>${t[5]!=null?` · <span class="num ${cls(t[5])}">${usd(t[5],0)}</span>`:""}<div class="why">${esc(t[6])}</div></div><span class="sub">${esc(t[0])}</span></div>`).join("")}</div></details>
