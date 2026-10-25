@@ -410,7 +410,7 @@ async function yahoo(tk,range="6mo"){
   const order=S.proxy!=null?[S.proxy,...[0,1,2].filter(i=>i!==S.proxy)]:[0,1,2];
   for(const i of order){try{const d=await getJSON(PROXIES[i](u),{},20000);const r=d.chart.result[0];
     const cl=r.indicators.quote[0].close,hist=[];r.timestamp.forEach((t,j)=>{if(cl[j])hist.push([new Date(t*1000).toISOString().slice(0,10),+cl[j].toFixed(4)])});
-    S.proxy=i;return [+(r.meta.regularMarketPrice||hist.at(-1)?.[1]||0)||null,hist]}catch(e){}}
+    S.proxy=i;return [+(r.meta.regularMarketPrice||hist.at(-1)?.[1]||0)||null,hist,r.meta.instrumentType||""]}catch(e){}}
   return [null,[]];
 }
 function parseCSV(text){
@@ -593,10 +593,11 @@ async function pullSEC(){
 }
 
 /* ================= Test on the past: the same rules replayed day by day over the last 12 months ================= */
-let btBusy=false,btMsg="";const BT_VER=2;   // bump when the rules change so the test reruns
+let btBusy=false,btMsg="";const BT_VER=3;   // bump when the rules change so the test reruns
 function allocTk(a){return /^[A-Z]{1,4}(\.[A-Z])?$/.test(a)}
 async function backtest(force){
-  if(btBusy||(!force&&S.btDay===today()&&S.btVer===BT_VER))return;btBusy=true;btMsg="Loading officials' filings…";render();
+  const hasSec=!!Object.keys(S.sec?.p||{}).length;   // rerun as soon as billionaires and funds arrive
+  if(btBusy||(!force&&S.btDay===today()&&S.btVer===BT_VER&&!!S.bt?.sec===hasSec))return;btBusy=true;btMsg="Loading officials' filings…";render();
   try{
     const end=today(),start=iso(dn(end)-365),pl=[];
     // 1) officials: net buying over the 12 months before each day, by the day the filing became public
@@ -612,18 +613,22 @@ async function backtest(force){
     for(const p of pl){
       if(p.kind==="usd"){for(const [,t,v] of p.rows)if(v>0)val.set(t,(val.get(t)||0)+Math.log10(1+v/1e3))}
       else for(const [,sh,px] of p.snaps)Object.entries(sh).map(([t,n])=>[t,n*(px[t]||0)]).filter(([t])=>allocTk(t)).sort((a,b)=>b[1]-a[1]).slice(0,8).forEach(([t],i)=>val.set(t,(val.get(t)||0)+8-i))}
-    const tks=["SPY",...[...val].sort((a,b)=>b[1]-a[1]).map(x=>x[0]).filter(t=>t!=="SPY").slice(0,260)],H={};let k=0;
-    for(const t of tks){btMsg=`Downloading price history ${++k} of ${tks.length}…`;if(k%10===1)render();const [,h]=await yahoo(t,"2y");if(h.length)H[t]=h;await sleep(80)}
+    const TY={},tks=["SPY",...[...val].sort((a,b)=>b[1]-a[1]).map(x=>x[0]).filter(t=>t!=="SPY").slice(0,260)],H={};let k=0;
+    for(const t of tks){btMsg=`Downloading price history ${++k} of ${tks.length}…`;if(k%10===1)render();const [,h,ty]=await yahoo(t,"2y");if(h.length)H[t]=h;if(ty)TY[t]=ty;await sleep(80)}
     if(!H.SPY)throw new Error("no S&P 500 history");
     const days=H.SPY.map(x=>x[0]).filter(d=>d<=end),s0=days.findIndex(d=>d>=start),PX={};
     for(const t in H){const m=new Map(H[t]),arr=new Array(days.length);let last=null,j=0;const hs=H[t];
       for(let i=0;i<days.length;i++){while(j<hs.length&&hs[j][0]<=days[i]){last=hs[j][1];j++}arr[i]=m.has(days[i])?m.get(days[i]):last}PX[t]=arr}
     for(const p of pl){
-      if(p.kind==="usd")p.at=(D)=>{const lo=iso(dn(D)-365),o={};for(const [s,t,v] of p.rows)if(s>lo&&s<=D)o[t]=(o[t]||0)+v;for(const t in o)if(o[t]<1e3)delete o[t];return o};
+      if(p.kind==="usd")p.at=(D,i,win=365)=>{const lo=iso(dn(D)-win),o={};for(const [s,t,v] of p.rows)if(s>lo&&s<=D)o[t]=(o[t]||0)+v;for(const t in o)if(o[t]<1e3)delete o[t];return o};
       else p.at=(D,i)=>{let sn=null;for(const x of p.snaps){if(x[0]<=D)sn=x;else break}const o={};if(sn)for(const t in sn[1]){const q=PX[t]?.[i];if(q&&sn[1][t]>0)o[t]=sn[1][t]*q}return o}}
     btMsg="Replaying the rules…";render();
     const groups=[["All players",pl],...["Government officials",SEC_G.f4,SEC_G.f13].map(g=>[g,pl.filter(p=>p.g===g)]).filter(x=>x[1].length)];
-    const runs=groups.map(([label,ps])=>({label,n:ps.length,...btSim(ps,PX,days,s0)}));
+    // what-if rows: same players, one rule changed at a time, to see what actually costs money
+    const off=pl.filter(p=>p.g==="Government officials"),fund=t=>/ETF|MUTUALFUND/.test(TY[t]||"");
+    if(off.length)groups.push(["Officials · no stop-losses",off,{noStops:1}],["Officials · only buys of the last 90 days",off,{win:90}],
+      ["Officials · without index and bond funds",off,{skip:fund}],["Officials · last 90 days, no funds, no stops",off,{win:90,skip:fund,noStops:1}]);
+    const runs=groups.map(([label,ps,opt])=>({label,n:ps.length,...btSim(ps,PX,days,s0,opt||{})}));
     const main=runs[0];
     S.bt={ts:nowTs(),from:days[s0],to:days.at(-1),np:pl.length,tickers:Object.keys(H).length,sec:!!Object.keys(S.sec?.p||{}).length,
       groups:runs.map(r=>({label:r.label,n:r.n,st:r.st})),curve:main.curve,trades:main.trades.slice(-400),hold:main.hold};
@@ -631,7 +636,7 @@ async function backtest(force){
   }catch(e){btMsg="The test could not run: "+e.message+". It tries again on the next run.";console.error(e)}
   finally{btBusy=false;save();render()}
 }
-function btSim(players,PX,days,s0){
+function btSim(players,PX,days,s0,opt={}){
   const acc={cash:P.CAPITAL,pos:{}},trades=[],curve=[],block={},px=(a,i)=>PX[a]?.[i]||null;let peak=P.CAPITAL,prevE=P.CAPITAL,paused=false,fees=0,dd=0;
   const E=i=>{let e=acc.cash;for(const a in acc.pos)e+=acc.pos[a].q*(px(a,i)||acc.pos[a].last);return e};
   const deal=(a,side,v,i,why)=>{const p=px(a,i);if(!p||v<=0)return;let fee=v*P.FEE_STOCK,pl=null;
@@ -644,10 +649,10 @@ function btSim(players,PX,days,s0){
     if(i>s0)acc.cash+=acc.cash*P.CASH_APY*(dn(days[i])-dn(days[i-1]))/365;
     for(const a in acc.pos){const p=px(a,i);if(p){acc.pos[a].last=p;acc.pos[a].hi=Math.max(acc.pos[a].hi,p)}}
     if(!paused){
-      for(const a of Object.keys(acc.pos)){const o=acc.pos[a],n=px(a,i);if(!n)continue;const tr=trailAt(a,i);
+      if(!opt.noStops)for(const a of Object.keys(acc.pos)){const o=acc.pos[a],n=px(a,i);if(!n)continue;const tr=trailAt(a,i);
         const why=n/o.avg-1<=P.STOP?"Stop-loss: down 15% from cost":n/o.hi-1<=-tr?`Trailing stop: ${pc(tr)} below the high`:"";if(why){deal(a,"sell",o.q*n,i,why);block[a]=i+Math.round(P.BLOCK_DAYS*252/365)}}
       const braked=E(i)/prevE-1<=P.DAY_LOSS,vot=[];
-      for(const p of players){const h=Object.entries(p.at(days[i-1],i)).filter(([a])=>px(a,i)&&!(block[a]>i)&&allocTk(a)),gross=h.reduce((s,[,v])=>s+Math.abs(v),0);   // only what was public by the day before
+      for(const p of players){const h=Object.entries(p.at(days[i-1],i,opt.win)).filter(([a])=>px(a,i)&&!(block[a]>i)&&allocTk(a)&&!(opt.skip&&opt.skip(a))),gross=h.reduce((s,[,v])=>s+Math.abs(v),0);   // only what was public by the day before
         if(gross>=P.MIN_BOOK)vot.push([p,h,gross,Math.log10(1+gross/1e4)])}
       const T=allocate(vot,()=>false),Eq=E(i),who=a=>(T.who[a]||[]).slice(0,2).map(x=>x[0]).join(", ");
       for(const a of Object.keys(acc.pos)){const cur=acc.pos[a].q*px(a,i),tv=Eq*(T.f[a]||0),x=cur-tv;
