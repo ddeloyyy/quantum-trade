@@ -1,0 +1,66 @@
+name: Quantum Trade bot
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "What to do"
+        type: choice
+        options: [run, stop, start, cashout, reset, add_wallet]
+        default: run
+      address:
+        description: "add_wallet only: 0x address"
+        required: false
+      name:
+        description: "add_wallet only: whose wallet"
+        required: false
+      chain:
+        description: "add_wallet only: network"
+        type: choice
+        options: [ethereum, base, hyperliquid]
+        default: ethereum
+permissions:
+  contents: write
+concurrency:
+  group: quantum-trade-bot
+  cancel-in-progress: false
+jobs:
+  bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get saved state (data branch)
+        run: |
+          mkdir -p data
+          git fetch origin data --depth=1 && git show origin/data:state.json > data/state.json || rm -f data/state.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Cache browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-1.48.2
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright@1.48.2
+          npx playwright install --with-deps chromium
+      - name: Run one bot round
+        env:
+          QT_COMMAND: ${{ inputs.command || 'run' }}
+          QT_ADDR: ${{ inputs.address }}
+          QT_NAME: ${{ inputs.name }}
+          QT_CHAIN: ${{ inputs.chain }}
+        run: node bot/run.js data/state.json
+      - name: Save state to the data branch
+        run: |
+          cd data
+          git init -q
+          git config user.name "quantum-trade-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git checkout -q -B data
+          git add state.json
+          git commit -q -m "bot round $(date -u +%FT%TZ)"
+          for i in 1 2 3 4; do git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data && break; sleep $((i*3)); done
