@@ -338,7 +338,8 @@ function allocate(vot,isCrypto,base){   // shared by the live bot and the test o
     const room=1-P.MIN_CASH-inv,fs=free.reduce((t,a)=>t+f[a],0);if(room<1e-6||!fs)break;for(const a of free)f[a]*=1+room/fs}};
   for(let r=0;r<4;r++){fill();let cut=false;for(const a in f)if(f[a]<P.MIN_W){delete f[a];cut=true}if(!cut)break}
   // whatever the strong players do not fill goes into the S&P 500, so idle money never lags the market
-  if(base){const r=1-P.MIN_CASH-Object.values(f).reduce((s,x)=>s+x,0);if(r>.01){f[base]=(f[base]||0)+r;(who[base]=who[base]||[]).push(["S&P 500 base",0])}}
+  if(base){const r=1-P.MIN_CASH-Object.values(f).reduce((s,x)=>s+x,0),bs=[].concat(base);   // one asset or several, split evenly
+    if(r>.01)for(const b of bs){f[b]=(f[b]||0)+r/bs.length;(who[b]=who[b]||[]).push(["Idle money",0])}}
   for(const a in who)who[a].sort((x,y)=>y[1]-x[1]);
   return {f,who,np,raw:Object.fromEntries(w.map(([a,x])=>[a,x/tot]))};
 }
@@ -613,7 +614,7 @@ async function pullSEC(){
 }
 
 /* ================= Test on the past: the same rules replayed day by day over the last 12 months ================= */
-let btBusy=false,btMsg="";const BT_VER=8;   // bump when the rules change so the test reruns
+let btBusy=false,btMsg="";const BT_VER=9;   // bump when the rules change so the test reruns
 function allocTk(a){return /^[A-Z]{1,4}(\.[A-Z])?$/.test(a)}
 async function backtest(force){   // crypto only: the Hyperliquid traders, measured against simply holding bitcoin
   const W=S.hlx?.w||{},hlW=Object.values(W),hlReady=hlW.length&&hlW.every(x=>x.day);
@@ -659,18 +660,46 @@ async function backtest(force){   // crypto only: the Hyperliquid traders, measu
     for(const p of S.players)if(p.id.startsWith("hl-")){const q=pl.find(x=>x.id===p.id);
       if(admit.includes(p.id))delete p.status;
       else p.status=["rejected",!q?"No trade history loaded":dn(days[last-1-L])<q.x.from?"Over 10,000 trades in the last months: too fast to copy (a bot or scalper)":"Its own trades over the last 6 months did not beat bitcoin"]}
+    let lab=null;try{lab=await btLab(pl,PX,days,s0,soloC,sStart)}catch(e){console.error("Settings lab:",e)}
     const main=runs[0];
-    S.bt={ts:nowTs(),from:days[s0],to:days.at(-1),np:pl.length,tickers:Object.keys(H).length,admit,hl:true,bench:"BTC",btc:btc[last]/btc[s0]-1,
+    S.bt={ts:nowTs(),lab,from:days[s0],to:days.at(-1),np:pl.length,tickers:Object.keys(H).length,admit,hl:true,bench:"BTC",btc:btc[last]/btc[s0]-1,
       groups:runs.map(r=>({label:r.label,n:r.n,st:r.st})),solo,curve:main.curve,trades:main.trades.slice(-400),hold:main.hold};
     S.btDay=today();S.btVer=BT_VER;btMsg="";feedPush("info",`Test on the past 12 months: ${pct(main.st.ret)} vs bitcoin ${pct(main.st.spy)}`,`${main.st.n} trades replayed with today's rules on ${pl.length} traders' own trade history.`,"player");
   }catch(e){btMsg="The test could not run: "+e.message+". It tries again on the next run.";console.error(e)}
   finally{btBusy=false;save();render()}
 }
+/* Settings lab: the same traders and history replayed with ~300 combinations of settings. To avoid picking a lucky
+   combination, the winner is chosen on the first half of the year only and then judged on the second half. */
+async function btLab(pl,PX,days,s0,soloC,sStart){
+  btMsg="Settings lab: loading the S&P 500…";render();
+  try{const [,h]=await yahoo("SPY","2y");if(h.length>100){const arr=[];let j=0,last=null;for(let i=0;i<days.length;i++){while(j<h.length&&h[j][0]<=days[i]){last=h[j][1];j++}arr.push(last)}if(arr[s0])PX.SPY=arr}}catch(e){}
+  const btc=PX["c:BTC"],last=days.length-1,mid=s0+Math.floor((last-s0)/2);
+  const admF=(L,rule)=>{const C=new Map();return (p,i)=>{const q=i-((i-s0)%30);let set=C.get(q);
+    if(!set){const ok=[];for(const x of pl){const c=soloC[x.id],k1=q-1-sStart,k0=k1-L;
+        if(k0<0||!c[k1]||!c[k0]||!btc[q-1-L]||dn(days[q-1-L])<x.x.from||!c.slice(k0,k1+1).some((v,j,a)=>j&&v!==a[j-1]))continue;
+        const r=c[k1]/c[k0],b=btc[q-1]/btc[q-1-L];if(r>1.0001&&(rule==="profit"||r>b*1.0001))ok.push([x.id,r])}
+      ok.sort((a,b)=>b[1]-a[1]);set=new Set((rule==="top5"?ok.slice(0,5):ok).map(x=>x[0]));C.set(q,set)}
+    return set.has(p.id)}};
+  const ADM={};for(const L of [90,180])for(const rule of ["btc","profit","top5"])ADM[L+rule]=admF(L,rule);
+  const IDLE={cash:null,BTC:"c:BTC"};if(PX.SPY){IDLE.SPY="SPY";IDLE["BTC+SPY"]=["c:BTC","SPY"]}
+  const CAPS={std:{MAX_ASSET:.15,PER_BACKER:.05,MAX_PLAYER:.12},loose:{MAX_ASSET:.25,PER_BACKER:.10,MAX_PLAYER:.25},max:{MAX_ASSET:.40,PER_BACKER:.20,MAX_PLAYER:.40}};
+  const part=(c,a,b)=>c[b-s0][1]/c[a-s0][1]-1,rows=[];let k=0;const total=Object.keys(IDLE).length*6*3*4;
+  for(const idle in IDLE)for(const L of [90,180])for(const rule of ["btc","profit","top5"])for(const cap in CAPS)for(const eq of [0,1])for(const lo of [0,1]){
+    if(++k%24===1){btMsg=`Settings lab: variant ${k} of ${total}…`;render();await sleep(0)}
+    const save={...P};Object.assign(P,CAPS[cap]);
+    let r;try{r=btSim(pl,PX,days,s0,{noStops:1,admit:ADM[L+rule],bench:"c:BTC",base:IDLE[idle],eq,longOnly:lo})}finally{Object.assign(P,save)}
+    rows.push([idle,L,rule,cap,eq,lo,+r.st.ret.toFixed(4),+r.st.dd.toFixed(4),+part(r.curve,s0,mid).toFixed(4),+part(r.curve,mid,last).toFixed(4),r.st.n,+r.st.expo.toFixed(3)])}
+  const isNow=x=>x[0]==="cash"&&x[1]===180&&x[2]==="btc"&&x[3]==="std"&&!x[4]&&!x[5];
+  const byH1=rows.slice().sort((a,b)=>b[8]-a[8]),pick=byH1[0],h2rank=1+rows.filter(x=>x[9]>pick[9]).length;
+  return {cols:["idle","lookback","rule","caps","equal","longOnly","ret","dd","h1","h2","trades","invested"],rows,now:rows.find(isNow),pick,h2rank,
+    mid:days[mid],btc:[+(btc[last]/btc[s0]-1).toFixed(4),+(btc[mid]/btc[s0]-1).toFixed(4),+(btc[last]/btc[mid]-1).toFixed(4)],
+    spy:PX.SPY?[+(PX.SPY[last]/PX.SPY[s0]-1).toFixed(4),+(PX.SPY[mid]/PX.SPY[s0]-1).toFixed(4),+(PX.SPY[last]/PX.SPY[mid]-1).toFixed(4)]:null};
+}
 // a player's own portfolio as they hold it, no caps and no cash: used to see how each person's stocks did by themselves
 function rawBook(vot){const f={},who={};for(const [p,h,gross] of vot)for(const [a,v] of h)if(v>0){f[a]=(f[a]||0)+v/gross/vot.length;(who[a]=who[a]||[]).push([p.name,v])}return {f,who,np:vot.length}}
 function btSim(players,PX,days,s0,opt={}){
   const BM=PX[opt.bench||"SPY"];
-  const acc={cash:P.CAPITAL,pos:{}},trades=[],curve=[],block={},px=(a,i)=>PX[a]?.[i]||null;let peak=P.CAPITAL,prevE=P.CAPITAL,paused=false,fees=0,dd=0;
+  const acc={cash:P.CAPITAL,pos:{}},trades=[],curve=[],block={},px=(a,i)=>PX[a]?.[i]||null;let peak=P.CAPITAL,prevE=P.CAPITAL,paused=false,fees=0,dd=0,expo=0;
   const E=i=>{let e=acc.cash;for(const a in acc.pos)e+=acc.pos[a].q*(px(a,i)||acc.pos[a].last);return e};
   const deal=(a,side,v,i,why)=>{const p=px(a,i);if(!p||v<=0)return;const fr=a.startsWith("c:")?P.FEE_CRYPTO:P.FEE_STOCK;let fee=v*fr,pl=null;
     if(side==="buy"){const q=(v-fee)/p,o=acc.pos[a]||(acc.pos[a]={q:0,avg:0,hi:p,last:p});o.avg=(o.avg*o.q+p*q)/(o.q+q);o.q+=q;acc.cash-=v}
@@ -686,21 +715,21 @@ function btSim(players,PX,days,s0,opt={}){
         const why=n/o.avg-1<=P.STOP?"Stop-loss: down 15% from cost":n/o.hi-1<=-tr?`Trailing stop: ${pc(tr)} below the high`:"";if(why){deal(a,"sell",o.q*n,i,why);block[a]=i+Math.round(P.BLOCK_DAYS*252/365)}}
       const braked=E(i)/prevE-1<=P.DAY_LOSS,vot=[];
       for(const p of players){if(opt.admit&&!opt.admit(p,i))continue;   // only what was public by the day before
-        const h=Object.entries((opt.old?p.hold:p.dec)(days[i-1],i)).filter(([a])=>px(a,i)&&!(block[a]>i)&&(allocTk(a)||a.startsWith("c:"))&&!(opt.skip&&opt.skip(a))),gross=h.reduce((s,[,v])=>s+Math.abs(v),0);
-        if(gross>=P.MIN_BOOK)vot.push([p,h,gross,Math.log10(1+gross/1e4)*(opt.old||p.cr?1:spread(h.length))])}
+        const h=Object.entries((opt.old?p.hold:p.dec)(days[i-1],i)).filter(([a,v])=>px(a,i)&&!(block[a]>i)&&(allocTk(a)||a.startsWith("c:"))&&!(opt.skip&&opt.skip(a))&&!(opt.longOnly&&v<=0)),gross=h.reduce((s,[,v])=>s+Math.abs(v),0);
+        if(gross>=P.MIN_BOOK)vot.push([p,h,gross,opt.eq?1:Math.log10(1+gross/1e4)*(opt.old||p.cr?1:spread(h.length))])}
       const T=opt.raw?rawBook(vot):allocate(vot,a=>a.startsWith("c:"),opt.base),Eq=E(i),who=a=>(T.who[a]||[]).slice(0,2).map(x=>x[0]).join(", ");
       for(const a of Object.keys(acc.pos)){const cur=acc.pos[a].q*px(a,i),tv=Eq*(T.f[a]||0),x=cur-tv;
         if(x>Math.max(P.MIN_TRADE,P.BAND*cur))deal(a,"sell",tv<P.MIN_TRADE?cur:x,i,T.f[a]?`Players cut it to ${pc(T.f[a],1)}`:"No tracked player holds it any more")}
       if(!braked)for(const [a,f] of Object.entries(T.f).sort((x,y)=>y[1]-x[1])){const tv=Eq*f,gap=tv-(acc.pos[a]?acc.pos[a].q*px(a,i):0);
         if(gap<=Math.max(P.MIN_TRADE,P.BAND*tv))continue;const v=Math.min(gap,acc.cash-Eq*(opt.raw?0:P.MIN_CASH));if(v<P.MIN_TRADE)break;deal(a,"buy",v,i,`Copying ${who(a)}: ${pc(f,1)}`)}
     }
-    const e=E(i);peak=Math.max(peak,e);dd=Math.min(dd,e/peak-1);prevE=e;
+    const e=E(i);peak=Math.max(peak,e);dd=Math.min(dd,e/peak-1);prevE=e;expo+=1-acc.cash/e;
     if(!paused&&!opt.raw&&e/peak-1<=P.KILL){for(const a of Object.keys(acc.pos))deal(a,"sell",acc.pos[a].q*px(a,i),i,"Emergency stop: account −20% from peak");paused=true}
     curve.push([days[i],Math.round(e),Math.round(P.CAPITAL*BM[i]/BM[s0])]);
   }
   const sells=trades.filter(t=>t[5]!=null),last=curve.at(-1),Ef=last[1];
   return {curve,trades,hold:Object.entries(acc.pos).map(([a,o])=>[a,Math.round(o.q*o.last),+(o.last/o.avg-1).toFixed(4)]).sort((x,y)=>y[1]-x[1]).slice(0,12),
-    st:{ret:Ef/P.CAPITAL-1,spy:last[2]/P.CAPITAL-1,dd,n:trades.length,won:sells.filter(t=>t[5]>0).length,lost:sells.filter(t=>t[5]<=0).length,fees,paused,end:Ef}};
+    st:{ret:Ef/P.CAPITAL-1,spy:last[2]/P.CAPITAL-1,dd,n:trades.length,won:sells.filter(t=>t[5]>0).length,lost:sells.filter(t=>t[5]<=0).length,fees,paused,end:Ef,expo:expo/curve.length}};
 }
 
 /* ================= Collectors ================= */
@@ -1038,6 +1067,11 @@ function renderBT(){
   ${B.solo?.length?`<div class="mh">Each trader alone: their own positions copied without leverage · ✓ = passes the check today and is copied</div>
   <div class="list" style="max-height:360px"><table><thead><tr><th>Player</th><th class="hide-sm">Kind</th><th class="r">12 months</th><th class="r">vs ${bn}</th><th class="r hide-sm">Worst drop</th></tr></thead><tbody>
   ${B.solo.map(([n,g,r,dd,,ok])=>{const bm=g===HL_G&&B.btc!=null?B.btc:m.spy;return `<tr><td>${ok?'<b class="up">✓</b> ':''}${esc(n)}</td><td class="sub hide-sm">${esc(g)}</td><td class="r num ${cls(r)}">${pct(r)}</td><td class="r num ${cls(r-bm)}">${pct(r-bm)}</td><td class="r num hide-sm">${pct(dd)}</td></tr>`}).join("")}</tbody></table></div>`:""}
+  ${B.lab?.rows?.length?(()=>{const X=B.lab,nm=x=>`idle money: ${x[0]} · ${x[1]}-day check · ${x[2]==="btc"?"beat BTC":x[2]==="profit"?"made money":"top 5"} · limits ${x[3]}${x[4]?" · equal votes":""}${x[5]?" · ignore shorts":""}`;
+    const top=X.rows.slice().sort((a,b)=>b[8]-a[8]).slice(0,8),row=(x,tag)=>`<tr><td>${tag?`<b>${tag}</b> `:""}${esc(nm(x))}</td><td class="r num ${cls(x[8])}">${pct(x[8])}</td><td class="r num ${cls(x[9])}">${pct(x[9])}</td><td class="r num hide-sm">${pct(x[7])}</td><td class="r num hide-sm">${pc(x[11])}</td></tr>`;
+    return `<div class="mh">Settings lab: ${X.rows.length} variants · picked on the first half (to ${esc(X.mid)}), checked on the second</div>
+    <div class="list" style="max-height:320px"><table><thead><tr><th>Variant</th><th class="r">1st half</th><th class="r">2nd half</th><th class="r hide-sm">Worst drop</th><th class="r hide-sm">Invested</th></tr></thead><tbody>
+    ${X.now?row(X.now,"Now:"):""}${top.map((x,i)=>row(x,i?"":"Best:")).join("")}<tr><td class="sub">Bitcoin just held</td><td class="r num">${pct(X.btc[1])}</td><td class="r num">${pct(X.btc[2])}</td><td></td><td></td></tr></tbody></table></div>`})():""}
   ${B.hold?.length?`<div class="mh">What it would hold today</div><div class="why">${B.hold.map(([a,v,r])=>`<b class="k-stock">${esc(a.replace(/^c:/,""))}</b> ${big(v)} <span class="${cls(r)}">${pct(r)}</span>`).join(" · ")}</div>`:""}
   <details style="margin-top:12px"><summary class="sub" style="cursor:pointer">Every trade it would have made (${B.trades.length}${m.n>B.trades.length?` latest of ${m.n}`:""})</summary>
     <div class="list" style="max-height:360px">${tr.map(t=>`<div class="row"><span class="tag t-${t[2]}">${t[2]}</span><div><b>${esc(t[1].replace(/^c:/,""))}</b> <span class="num">${usd(t[3],0)}</span> at <span class="num">${usd(t[4])}</span>${t[5]!=null?` · <span class="num ${cls(t[5])}">${usd(t[5],0)}</span>`:""}<div class="why">${esc(t[6])}</div></div><span class="sub">${esc(t[0])}</span></div>`).join("")}</div></details>
