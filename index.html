@@ -192,8 +192,8 @@ dialog label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px}
 const P={CAPITAL:10000,WIN:30,THR:.6,HALF_LIFE:10,
   TIERS:[[10e6,"large",.16,1],[1e6,"medium",.08,.5],[50e3,"regular",.03,.25],[0,"small",.015,.25]],BIG:50e3,
   STOP:-.15,TRAIL_K:2.5,TRAIL_MIN:.10,TRAIL_MAX:.25,TP_LEVEL:.30,TP_FRAC:1/3,
-  MAX_ASSET:.15,MAX_ASSET_CRYPTO:.10,MAX_CRYPTO:.90,MIN_CASH:.10,DAY_LOSS:-.04,KILL:-.20,
-  MIN_TRADE:100,HOLD_W:.04,COOLDOWN:3600e3,FEE_CRYPTO:.0008,FEE_STOCK:.0002,CASH_APY:.035,MIN_LIQ:10e6,MIN_BOOK:5e3,MAX_N:25,MAX_PLAYER:.12,STOPS:false,PER_BACKER:.05,BLOCK_DAYS:30,MIN_W:.015,BAND:.25,TARGET_VOL:.45,CHASE_SKIP:.20,CHASE_HALF:.10,HIT_H:20,STALE:120};
+  MAX_ASSET:.40,MAX_ASSET_CRYPTO:.10,MAX_CRYPTO:.90,MIN_CASH:.10,DAY_LOSS:-.04,KILL:-.20,
+  MIN_TRADE:100,HOLD_W:.04,COOLDOWN:3600e3,FEE_CRYPTO:.0008,FEE_STOCK:.0002,CASH_APY:.035,MIN_LIQ:10e6,MIN_BOOK:5e3,MAX_N:25,MAX_PLAYER:.40,STOPS:false,PER_BACKER:.20,BLOCK_DAYS:30,MIN_W:.015,BAND:.25,TARGET_VOL:.45,CHASE_SKIP:.20,CHASE_HALF:.10,HIT_H:20,STALE:120};
 const WATCH_GROUPS=new Set(["Market makers","Funds & treasuries","Crypto founders","Trump family & WLFI","Whales","Traders"]);   // named wallets mostly move money between their own accounts and cannot be tested: shown, not copied
 const KEY="quantum-trade-live-v2";
 const DAY=864e5;
@@ -324,7 +324,7 @@ function target(){
 }
 function allocate(vot,isCrypto,base){   // shared by the live bot and the test on the past
   const sc={},who={};let tot=0,np=0;
-  for(let it=0;it<6;it++){const s=vot.reduce((t,v)=>t+v[3],0);for(const v of vot)v[3]=Math.min(v[3],P.MAX_PLAYER*s)}  // no single player steers more than 12%
+  for(let it=0;it<6;it++){const s=vot.reduce((t,v)=>t+v[3],0);for(const v of vot)v[3]=Math.min(v[3],P.MAX_PLAYER*s)}  // no single player steers more than 40%
   for(const [p,h,gross,bud] of vot){tot+=bud;np++;
     for(const [a,v] of h){const x=bud*v/gross;sc[a]=(sc[a]||0)+x;if(v>0)(who[a]=who[a]||[]).push([p.name,x])}}
   let w=Object.entries(sc).filter(([,x])=>x>0).sort((a,b)=>b[1]-a[1]).slice(0,P.MAX_N);
@@ -614,7 +614,7 @@ async function pullSEC(){
 }
 
 /* ================= Test on the past: the same rules replayed day by day over the last 12 months ================= */
-let btBusy=false,btMsg="";const BT_VER=9;   // bump when the rules change so the test reruns
+let btBusy=false,btMsg="";const BT_VER=10;   // bump when the rules change so the test reruns
 function allocTk(a){return /^[A-Z]{1,4}(\.[A-Z])?$/.test(a)}
 async function backtest(force){   // crypto only: the Hyperliquid traders, measured against simply holding bitcoin
   const W=S.hlx?.w||{},hlW=Object.values(W),hlReady=hlW.length&&hlW.every(x=>x.day);
@@ -644,22 +644,27 @@ async function backtest(force){   // crypto only: the Hyperliquid traders, measu
     btMsg="Checking every trader's own record…";render();
     const L=180,sStart=Math.max(1,s0-L-3),soloC={},btc=PX["c:BTC"],admC=new Map();
     for(const p of pl)soloC[p.id]=btSim([p],PX,days,sStart,{raw:1,noStops:1,bench:"c:BTC"}).curve.map(c=>c[1]);
-    const admitAt=(p,i)=>{const q=i-((i-s0)%30),key=p.id+"|"+q;if(admC.has(key))return admC.get(key);
+    const passAt=(p,i)=>{const q=i-((i-s0)%30),key=p.id+"|"+q;if(admC.has(key))return admC.get(key);
       const c=soloC[p.id],k1=q-1-sStart,k0=k1-L;let ok=false;
       if(k0>=0&&c[k1]&&c[k0]&&btc[q-1-L]&&btc[q-1]&&dn(days[q-1-L])>=p.x.from)
         ok=c[k1]/c[k0]>Math.max(btc[q-1]/btc[q-1-L],1)*1.0001&&c.slice(k0,k1+1).some((v,j,a)=>j&&v!==a[j-1]);
       admC.set(key,ok);return ok};
+    // the settings lab (Nov 2026) found that copying only the 5 strongest of the traders who pass beats copying all of them
+    const topC=new Map(),admitAt=(p,i)=>{const q=i-((i-s0)%30);let set=topC.get(q);
+      if(!set){const k1=q-1-sStart,k0=k1-L;set=new Set(pl.filter(x=>passAt(x,i)).map(x=>[x.id,soloC[x.id][k1]/soloC[x.id][k0]]).sort((a,b)=>b[1]-a[1]).slice(0,5).map(x=>x[0]));topC.set(q,set)}
+      return set.has(p.id)};
     btMsg="Replaying the rules…";render();
     const NEW={noStops:1,admit:admitAt,bench:"c:BTC"};
-    const groups=[["Traders who pass the 6-month check (what the bot does)",pl,NEW],["All traders, no check",pl,{noStops:1,bench:"c:BTC"}],
-      ["Checked traders, with stop-losses",pl,{admit:admitAt,bench:"c:BTC"}]];
-    const runs=groups.map(([label,ps,opt])=>({label,n:ps.length,...btSim(ps,PX,days,s0,opt)}));
+    const OLD={MAX_ASSET:.15,PER_BACKER:.05,MAX_PLAYER:.12};
+    const groups=[["Top 5 traders who pass the 6-month check (what the bot does)",pl,NEW],["Every trader who passes, old tight limits (before Nov 2026)",pl,{noStops:1,admit:passAt,bench:"c:BTC"},OLD],
+      ["All traders, no check",pl,{noStops:1,bench:"c:BTC"}],["Top 5, with stop-losses",pl,{admit:admitAt,bench:"c:BTC"}]];
+    const runs=groups.map(([label,ps,opt,cfg])=>{const save={...P};Object.assign(P,cfg||{});try{return {label,n:ps.length,...btSim(ps,PX,days,s0,opt)}}finally{Object.assign(P,save)}});
     const last=days.length-1,admit=pl.filter(p=>admitAt(p,last)).map(p=>p.id);
     const solo=pl.map(p=>{const c=soloC[p.id].slice(s0-sStart);let pk=c[0],dd=0;for(const v of c){pk=Math.max(pk,v);dd=Math.min(dd,v/pk-1)}
       const moved=c.some((v,j)=>j&&v!==c[j-1]);return [p.name,p.g,+(c.at(-1)/c[0]-1).toFixed(4),+dd.toFixed(4),moved?1:0,admit.includes(p.id)?1:0,p.id]}).filter(x=>x[4]).sort((a,b)=>b[2]-a[2]);
     for(const p of S.players)if(p.id.startsWith("hl-")){const q=pl.find(x=>x.id===p.id);
       if(admit.includes(p.id))delete p.status;
-      else p.status=["rejected",!q?"No trade history loaded":dn(days[last-1-L])<q.x.from?"Over 10,000 trades in the last months: too fast to copy (a bot or scalper)":"Its own trades over the last 6 months did not beat bitcoin"]}
+      else p.status=["rejected",!q?"No trade history loaded":dn(days[last-1-L])<q.x.from?"Over 10,000 trades in the last months: too fast to copy (a bot or scalper)":passAt(q,last)?"Passes the check, but is not among the 5 strongest right now":"Its own trades over the last 6 months did not beat bitcoin"]}
     let lab=null;try{lab=await btLab(pl,PX,days,s0,soloC,sStart)}catch(e){console.error("Settings lab:",e)}
     const main=runs[0];
     S.bt={ts:nowTs(),lab,from:days[s0],to:days.at(-1),np:pl.length,tickers:Object.keys(H).length,admit,hl:true,bench:"BTC",btc:btc[last]/btc[s0]-1,
@@ -1039,7 +1044,7 @@ function render(){
   const ws=Object.entries(W).map(([a,x])=>{const id="hl-"+a.slice(2,10);return {a,x,r:sr[id],ok:!!S.bt?.hl&&adm.includes(id)}}).sort((u,v)=>(v.ok-u.ok)||((v.r?.[2]??-9)-(u.r?.[2]??-9)));
   $("scout").innerHTML=ws.length?ws.map(({a,x,r,ok})=>{const tag=ok?"copied":!x.h?"loading":S.bt?.hl?"not copied":"testing";
     return `<div class="row"><span class="tag ${ok?"t-buy":tag==="not copied"?"t-sell":"t-move"}">${tag}</span><div><b>${esc(x.name)}</b><div class="why">${x.av?`account ${big(x.av)} · `:""}${x.h?`${(x.n||0).toLocaleString("en-US")} trades since ${esc(iso(x.from))}`:"trade history not loaded yet"}${r?` · copied alone for 12 months: <span class="${cls(r[2])}">${pct(r[2])}</span>`:""}</div><a class="sub" href="https://app.hyperliquid.xyz/explorer/address/${esc(a)}" target="_blank" rel="noopener">${esc(short(a))}</a></div><span></span></div>`}).join(""):'<div class="empty">The GitHub run loads the traders and their full trade history.</div>';
-  const rl=[["Only crypto","coins traded on Hyperliquid; no stocks"],["Who is copied","top Hyperliquid traders whose own trades beat bitcoin and made money over the last 6 months (checked monthly on their full trade history)"],["Not copied","high-speed bots and scalpers, traders who lag bitcoin, named wallets that only move money around"],["How it copies","what the checked traders hold now, without leverage; their shorts lower the target"],["Player vote","track record × size (log)"],["Max per coin","15% (needs 3+ traders holding it), one trader's coin max 5%"],["Max in coins","90%"],["Cash kept","at least 10%, earns 3.5% a year; money no checked trader is using also stays in cash"],["Trades when","off target by >25% and >$100"],["Coins copied","daily volume ≥$10M"],["Stop-losses","off"],["Daily loss brake","no buys after −4%"],["Emergency stop","−20% from peak"],["Fee per trade","0.08%"]];
+  const rl=[["Only crypto","coins traded on Hyperliquid; no stocks"],["Who is copied","the 5 strongest top Hyperliquid traders whose own trades beat bitcoin and made money over the last 6 months (re-checked monthly on their full trade history)"],["Not copied","high-speed bots and scalpers, traders who lag bitcoin, named wallets that only move money around"],["How it copies","what the checked traders hold now, without leverage; their shorts lower the target"],["Player vote","track record × size (log), max 40% per trader"],["Max per coin","40% (one trader's coin max 20%)"],["Max in coins","90%"],["Cash kept","at least 10%, earns 3.5% a year; money no checked trader is using also stays in cash"],["Trades when","off target by >25% and >$100"],["Coins copied","daily volume ≥$10M"],["Stop-losses","off"],["Daily loss brake","no buys after −4%"],["Emergency stop","−20% from peak"],["Fee per trade","0.08%"]];
   $("rules").innerHTML=rl.map(r=>`<div><span class="sub">${r[0]}</span><b class="num">${esc(r[1])}</b></div>`).join("");
 }
 function renderBT(){
@@ -1075,7 +1080,7 @@ function renderBT(){
   ${B.hold?.length?`<div class="mh">What it would hold today</div><div class="why">${B.hold.map(([a,v,r])=>`<b class="k-stock">${esc(a.replace(/^c:/,""))}</b> ${big(v)} <span class="${cls(r)}">${pct(r)}</span>`).join(" · ")}</div>`:""}
   <details style="margin-top:12px"><summary class="sub" style="cursor:pointer">Every trade it would have made (${B.trades.length}${m.n>B.trades.length?` latest of ${m.n}`:""})</summary>
     <div class="list" style="max-height:360px">${tr.map(t=>`<div class="row"><span class="tag t-${t[2]}">${t[2]}</span><div><b>${esc(t[1].replace(/^c:/,""))}</b> <span class="num">${usd(t[3],0)}</span> at <span class="num">${usd(t[4])}</span>${t[5]!=null?` · <span class="num ${cls(t[5])}">${usd(t[5],0)}</span>`:""}<div class="why">${esc(t[6])}</div></div><span class="sub">${esc(t[0])}</span></div>`).join("")}</div></details>
-  <div class="note"><b>How it is tested:</b> each trader's positions are rebuilt day by day from every trade they made on Hyperliquid. Each day the bot only uses what the traders held at the end of the day before, buys at that day's closing price, without leverage, and pays the fees. Every month it re-checks who passes, using only the 6 months before.<br>
+  <div class="note"><b>How it is tested:</b> each trader's positions are rebuilt day by day from every trade they made on Hyperliquid. Each day the bot only uses what the traders held at the end of the day before, buys at that day's closing price, without leverage, and pays the fees. Every month it re-checks who passes and keeps the 5 strongest, using only the 6 months before.<br>
   <b>Why it is not a promise:</b> the traders were picked from today's leaderboard, so traders who blew up and vanished are missing, which flatters the result; the monthly check on earlier months is there to make it fairer. Traders with more than 10,000 trades have a shorter history and cannot pass. One good year proves little; watch the live demo for a few months before you put in real money.</div>
   ${btMsg?`<div class="note">${esc(btMsg)}</div>`:""}`;
 }
